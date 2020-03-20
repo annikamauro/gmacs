@@ -13,3 +13,6 @@
 
 (key-chord-define-global "l," "<")
 (key-chord-define-global ".;" ">")
+
+(setq org-latex-packages-alist
+      '(("" "am-math" t)))
