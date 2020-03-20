@@ -16,3 +16,15 @@
 
 (setq org-latex-packages-alist
       '(("" "am-math" t)))
+
+(after! ox-latex
+       (add-to-list 'org-latex-classes
+              '("am-hmw"
+                "\\documentclass[12pt]{article}
+                \\usepackage{am-hmw}
+[NO-DEFAULT-PACKAGES]"
+                ("\\section{%s}" . "\\section*{%s}")
+                ("\\subsection{%s}" . "\\subsection*{%s}")
+                ("\\subsubsection{%s}" . "\\subsubsection*{%s}")))
+
+       (setq org-latex-default-class "am-hmw"))

@@ -48,7 +48,7 @@
 ** %s @ $1
 %s
 * Options :noexport:
-#+LATEX_CLASS_OPTIONS: [notoc,nosubsec]
+#+LATEX_CLASS_OPTIONS: [12pt]
 # Local variables:
 # eval: (add-hook 'after-save-hook 'gm/org-latex-export nil t)
 # end:
