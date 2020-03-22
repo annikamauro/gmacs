@@ -45,7 +45,8 @@
 ** %s @ $1
 %s
 * Options :noexport:
-#+LATEX_CLASS_OPTIONS: [12pt]
+#+OPTIONS: num:nil
+#+LATEX_HEADER: \\renewcommand{\\course}{%s}
 # Local variables:
 # eval: (add-hook 'after-save-hook 'gm/org-latex-export nil t)
 # end:
@@ -54,5 +55,6 @@ file
 course-name
 course-name
 stamps
+course-name
 )))
 (yas-expand-snippet snippet-text))

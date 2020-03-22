@@ -7,9 +7,6 @@
 
 (setq preview-colors '(nil 1 nil))
 (load-theme 'solarized-light)
-;; (add-hook 'LaTeX-mode-hook #'quick-math-mode)
-;; (require 'cdlatex)
-;; (add-hook 'LateX-mode-hook #'cdlatex-mode)
 
 (key-chord-define-global "l," "<")
 (key-chord-define-global ".;" ">")
@@ -28,3 +25,7 @@
                 ("\\subsubsection{%s}" . "\\subsubsection*{%s}")))
 
        (setq org-latex-default-class "am-hmw"))
+
+(setq org-format-latex-options (plist-put org-format-latex-options :scale 1))
+
+(setq user-full-name "Annika Mauro")
