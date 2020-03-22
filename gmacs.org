@@ -101,9 +101,7 @@ Enable lexical binding.
 #+END_SRC
 Always load up a server when opening Emacs.
 #+BEGIN_SRC emacs-lisp
-(unless (and (boundp 'server-process)
-             (memq (process-status server-process) '(connect listen open run)))
-  (server-start))
+(server-start)
 #+END_SRC
 I was inspired to implement the following optimizations in GMACS thanks to
 [[https://github.com/nilcons/emacs-use-package-fast][nilcons/emacs-use-package-fast]]. During startup, we make the garbage collection
@@ -247,6 +245,49 @@ We load some packages that I use throughout my configuration.
 (eval-when-compile (require 'cl-lib))
 #+END_SRC
 * General Configuration
+** Macros
+Elisp macros. =after!= and =lambda!= are from the popular DOOM! Emacs
+configuration. The documentation on these will be sparse, because the docstrings
+do an excellent job of explaining what's going on.
+*** after!
+#+BEGIN_SRC emacs-lisp
+(defmacro after! (feature &rest forms)
+  "A smart wrapper around `with-eval-after-load'. Supresses warnings during
+compilation."
+  (declare (indent defun) (debug t))
+  `(,(if (or (not (bound-and-true-p byte-compile-current-file))
+             (if (symbolp feature)
+                 (require feature nil :no-error)
+               (load feature :no-message :no-error)))
+         #'progn
+       #'with-no-warnings)
+    (with-eval-after-load ',feature ,@forms)))
+#+END_SRC
+*** lambda!
+#+BEGIN_SRC emacs-lisp
+(defmacro lambda! (&rest body)
+  "A shortcut for inline interactive lambdas."
+  (declare (doc-string 1))
+  `(lambda () (interactive) ,@body))
+#+END_SRC
+*** Conditional Keybindings
+Obtained from [[http://endlessparentheses.com/define-context-aware-keys-in-emacs.html][Endless Parentheses]].
+#+BEGIN_SRC emacs-lisp
+(defmacro define-conditional-key (keymap key def &rest body)
+  "In KEYMAP, define key sequence KEY as DEF conditionally.
+This is like `define-key', except the definition
+\"disappears\" whenever BODY evaluates to nil."
+  (declare (indent 3)
+           (debug (form form form &rest sexp)))
+  `(define-key ,keymap ,key
+     '(menu-item
+       ,(format "maybe-%s" (or (car (cdr-safe def)) def))
+       nil
+       :filter (lambda (&optional _)
+                 (when ,(macroexp-progn body)
+                   ,def)))))
+#+END_SRC
+
 ** User Interface
 Show off the title.
 #+BEGIN_SRC emacs-lisp
@@ -507,48 +548,6 @@ experience. That means fewer annoyingly long pauses while you are using Emacs.
   :diminish
   :config (gcmh-mode 1))
 #+END_SRC
-*** Macros
-Now for the Elisp macros. =after!= and =lambda!= are from the popular DOOM! Emacs
-configuration. The documentation on these will be sparse, because the docstrings
-do an excellent job of explaining what's going on.
-**** after!
-#+BEGIN_SRC emacs-lisp
-(defmacro after! (feature &rest forms)
-  "A smart wrapper around `with-eval-after-load'. Supresses warnings during
-compilation."
-  (declare (indent defun) (debug t))
-  `(,(if (or (not (bound-and-true-p byte-compile-current-file))
-             (if (symbolp feature)
-                 (require feature nil :no-error)
-               (load feature :no-message :no-error)))
-         #'progn
-       #'with-no-warnings)
-    (with-eval-after-load ',feature ,@forms)))
-#+END_SRC
-**** lambda!
-#+BEGIN_SRC emacs-lisp
-(defmacro lambda! (&rest body)
-  "A shortcut for inline interactive lambdas."
-  (declare (doc-string 1))
-  `(lambda () (interactive) ,@body))
-#+END_SRC
-**** Conditional Keybindings
-Obtained from [[http://endlessparentheses.com/define-context-aware-keys-in-emacs.html][Endless Parentheses]].
-#+BEGIN_SRC emacs-lisp
-(defmacro define-conditional-key (keymap key def &rest body)
-  "In KEYMAP, define key sequence KEY as DEF conditionally.
-This is like `define-key', except the definition
-\"disappears\" whenever BODY evaluates to nil."
-  (declare (indent 3)
-           (debug (form form form &rest sexp)))
-  `(define-key ,keymap ,key
-     '(menu-item
-       ,(format "maybe-%s" (or (car (cdr-safe def)) def))
-       nil
-       :filter (lambda (&optional _)
-                 (when ,(macroexp-progn body)
-                   ,def)))))
-#+END_SRC
 *** Better Defaults
 All the things (perhaps they seem little) that just make sense to have.
 **** From Yes/No to y/n
@@ -644,9 +643,9 @@ having to type both keystrokes again.
   "Call ORIG-FUN until the cursor moves.
 Try the repeated popping up to 10 times."
   (let ((p (point)))
-    (dotimes (i 10)
-      (when (= p (point))
-        (apply orig-fun args)))))
+    (cl-loop repeat 10 do
+             (when (= p (point))
+               (apply orig-fun args)))))
 
 (advice-add 'pop-to-mark-command :around #'modi/multi-pop-to-mark)
 #+END_SRC
@@ -671,11 +670,6 @@ create necessary directories (from this [[https://superuser.com/questions/131538
     (let ((dir (file-name-directory filename)))
       (unless (file-exists-p dir)
         (make-directory dir)))))
-#+END_SRC
-**** Keep =custom.el= Clean
-Don't let =package.el= [[http://www.holgerschurig.de/en/emacs-dont-let-packages-pollute-custom-el/][pollute]] your custom file.
-#+BEGIN_SRC emacs-lisp
-(defun package--save-selected-packages () nil)
 #+END_SRC
 **** Auto =chmod +x=
 Make files that start with a =#!= shebang executable.
@@ -736,7 +730,7 @@ function with our own silent version.
 (defvar bjm/auto-save-timer nil
   "Timer to run `bjm/auto-save-silent'")
 
-(defvar bjm/auto-save-interval 5
+(defvar bjm/auto-save-interval 15
   "How often in seconds of idle time to auto-save with
 `bjm/auto-save-silent'")
 
@@ -1291,9 +1285,6 @@ otherwise kill destination buffer."
           (erase-buffer)
           (insert string))
         (write-file (buffer-name)))
-
-      ;; Set COMPLETE flag and run hooks.
-      (setq complete t)
       (run-hooks hook))))
 #+END_SRC
 **** Easier Regexp
@@ -1712,6 +1703,22 @@ Emacs treats camelCase strings as a single word by default. Not anymore.
 #+BEGIN_SRC emacs-lisp
 (global-subword-mode 1)
 #+END_SRC
+We use =lsp-mode= to set up an IDE.
+#+BEGIN_SRC emacs-lisp
+(use-package company
+  :custom
+  (company-minimum-prefix-length 1)
+  (company-idle-delay 0.0))
+
+(use-package lsp-mode
+  ;; set prefix for lsp-command-keymap (few alternatives - "C-l", "C-c l")
+  :init (setq lsp-keymap-prefix "s-l")
+  :hook ((c++-mode . lsp))
+  :commands lsp
+  :config
+  (use-package lsp-ivy :commands lsp-ivy-workspace-symbol)
+  (use-package company-lsp :commands company-lsp))
+#+END_SRC
 *** Flycheck Hydra
 #+BEGIN_SRC emacs-lisp :tangle no :noweb-ref hydra
 (defhydra hydra-flycheck (:color blue)
@@ -1775,6 +1782,11 @@ backwards are clunky: =C-M-f=, =C-M-b=. Since I've already taken my =M-digit=
 #+BEGIN_SRC emacs-lisp
 (bind-key "M-9" #'backward-sexp)
 (bind-key "M-0" #'forward-sexp)
+#+END_SRC
+*** C++
+#+BEGIN_SRC emacs-lisp
+(setq-default c-default-style "linux"
+              c-basic-offset 4)
 #+END_SRC
 ** Packages
 *** Package Management
@@ -1866,7 +1878,8 @@ Open with external viewer by default if wanted.
 #+END_SRC
 Allow rotation.
 #+BEGIN_SRC emacs-lisp
-(defun pdf-view--rotate (&optional counterclockwise-p page-p)
+(after! pdf-tools
+  (defun pdf-view--rotate (&optional counterclockwise-p page-p)
   "Rotate PDF 90 degrees.  Requires pdftk to work.\n
 Clockwise rotation is the default; set COUNTERCLOCKWISE-P to
 non-nil for the other direction.  Rotate the whole document by
@@ -1899,7 +1912,7 @@ default; set PAGE-P to non-nil to rotate only the current page.
                                          "&& mv %s.NEW %s")
                                  file pages file file file)))
             (pdf-view-revert-buffer nil t)
-          (error "Rotation error!"))))))
+          (error "Rotation error!")))))))
 #+END_SRC
 Open PDFs to where they were last opened.
 #+BEGIN_SRC emacs-lisp
@@ -1911,7 +1924,13 @@ Open PDFs to where they were last opened.
   (pdf-view-restore-filename "~/.emacs.d/cache/.pdf-view-restore"))
 #+END_SRC
 **** Epub reading
-We use =nov.el=.
+We use =nov.el=. Change default reading font from Source Sans Pro (my default
+variable pitch font) to Minion Pro.
+#+BEGIN_SRC emacs-lisp
+(defun gm/nov-font-setup ()
+  (face-remap-add-relative 'variable-pitch :family "Minion Pro"
+                                           :height 2.0))
+#+END_SRC
 #+BEGIN_SRC emacs-lisp :noweb no-export
 (use-package nov
   :commands (nov-mode)
@@ -1919,13 +1938,6 @@ We use =nov.el=.
   :hook (nov-mode . gm/nov-font-setup)
   :config
   <<nov-settings>>)
-#+END_SRC
-Change default reading font from Source Sans Pro (my default variable pitch
-font) to Minion Pro.
-#+BEGIN_SRC emacs-lisp
-(defun gm/nov-font-setup ()
-  (face-remap-add-relative 'variable-pitch :family "Minion Pro"
-                                           :height 2.0))
 #+END_SRC
 Justifying e-book text. This code was taken from [[https://github.com/wasamasa/nov.el][wasamasa/nov.el]].
 #+BEGIN_SRC emacs-lisp :tangle no :noweb-ref nov-settings
@@ -2320,11 +2332,14 @@ Set tramp connection history location.
   (counsel-grep-base-command
    "rg -i -M 120 --color auto --line-number %s %s"))
 
-(use-package smex
+(use-package amx
   :after counsel
+  :config
+  (amx-mode 1)
   :custom
-  (smex-save-file (expand-file-name "smex" gmacs-cache-dir))
-  (smex-history-length 50))
+  (amx-save-file (expand-file-name "amx" gmacs-cache-dir))
+  (amx-history-length 50)
+  (amx-show-key-bindings nil))
 #+END_SRC
 I want to ignore certain file extensions when searching for a file, so I add
 them to the regexp in =counsel-find-file-ignore-regexp=.
@@ -2562,7 +2577,6 @@ Properly patch functions.
 Simple client for =transmission-cli=.
 #+BEGIN_SRC emacs-lisp
 (use-package transmission
-  :ensure nil
   :commands (transmission transmission-add)
   :config (add-to-list 'transmission-refresh-modes 'transmission-mode)
   :bind (:map transmission-mode-map
@@ -2584,6 +2598,11 @@ Spray is a speed-reading package for Emacs.
   :custom
   (spray-margin-top 5)
   (spray-margin-left 1.5))
+#+END_SRC
+*** Togetherly
+#+BEGIN_SRC emacs-lisp
+(use-package togetherly
+  :commands (togetherly-server-start togetherly-client-start))
 #+END_SRC
 * Keybindings
 ** Better Defaults
@@ -3415,13 +3434,14 @@ a paper for school.
 I narrow to subtree by default because displaying the count for every subtree in
 the file is (usually) unnecessary and (always) too slow.
 #+BEGIN_SRC emacs-lisp
-(defun gm/wc-display-current-subtree (arg)
-  (interactive "P")
-  (if arg
-      (org-wc-display nil)
-    (save-restriction
-      (org-narrow-to-subtree)
-      (org-wc-display nil))))
+(after! org-wc
+  (defun gm/wc-display-current-subtree (arg)
+    (interactive "P")
+    (if arg
+        (org-wc-display nil)
+      (save-restriction
+        (org-narrow-to-subtree)
+        (org-wc-display nil)))))
 #+END_SRC
 *** Org Ref
 A wonderfully featured framework for maintaining bibliographies and writing
@@ -3765,7 +3785,7 @@ as `org-src-fontify-natively' is non-nil."
 *** Inline Remote Images
 Add the link type.
 #+BEGIN_SRC emacs-lisp
-(org-add-link-type
+(org-link-set-parameters
  "image-url"
  (lambda (path)
    (let ((img (expand-file-name
@@ -3968,7 +3988,7 @@ Use =imagemagick=.
 #+END_SRC
 Not too small.
 #+BEGIN_SRC emacs-lisp :tangle no :noweb-ref org-settings
-(when gm/user (setq org-format-latex-options (plist-put org-format-latex-options :scale 2.75)))
+(setq org-format-latex-options (plist-put org-format-latex-options :scale 2.75))
 #+END_SRC
 Where should it be? Let's put them all in the same place, so that common
 fragments (like =x^2=) are never generated more than once and so that we don't
@@ -4384,9 +4404,10 @@ Set up the mail directory and draft location.
 #+END_SRC
 Provide my email and name.
 #+BEGIN_SRC emacs-lisp :tangle no :noweb-ref notmuch-settings
-(setq mail-user-agent 'message-user-agent
-      user-mail-address gm--email
-      user-full-name "Gautam Manohar")
+(when gm/user
+  (setq mail-user-agent 'message-user-agent
+        user-mail-address gm--email
+        user-full-name "Gautam Manohar"))
 #+END_SRC
 SMTP for sending mail. The =stream-type= is important because I want my outgoing
 mail to at least use TLS encryption. One day, though, I would like to adopt a
@@ -4717,8 +4738,8 @@ other forms of media, such as blogs. I plan to also use it for academic articles
 when the need arises. Many of the snippets (tagged =bjm/=) I use here was written
 by the author of [[http://pragmaticemacs.com][Pragmatic Emacs]].
 #+BEGIN_SRC emacs-lisp :noweb no-export
-(autoload 'elfeed "elfeed")
-(autoload 'elfeed-db-load "elfeed")
+(use-package elfeed
+  :commands (elfeed elfeed-db-load))
 (setq elfeed-db-directory "~/.emacs.d/.elfeed")
 (after! elfeed
   (bind-keys :map elfeed-search-mode-map
@@ -4773,7 +4794,8 @@ Then we add a visual indicator.
 #+BEGIN_SRC emacs-lisp
 (defface elfeed-search-starred-title-face
   '((t :foreground "#f77"))
-  "Marks a starred Elfeed entry.")
+  "Marks a starred Elfeed entry."
+  :group 'basic-faces)
 #+END_SRC
 #+BEGIN_SRC emacs-lisp :tangle no :noweb-ref elfeed-settings
 (push '(starred elfeed-search-starred-title-face) elfeed-search-face-alist)
@@ -5636,7 +5658,7 @@ and shifted notes use different link types.
              (path (org-element-property :path element)))
         (when (equal path "marginnote")
           (apply 'delete-region remove)
-          (insert (format "[[latex-opt:marginnote][%s;0ex]]" (replace-regexp-in-string shift-regexp "" description) shift))))))
+          (insert (format "[[latex-opt:marginnote][%s;0ex]]" (replace-regexp-in-string shift-regexp "" description)))))))
 #+END_SRC
 *** Inkscape Figures
 This is the mode we will load in Inkscape when we insert math.
