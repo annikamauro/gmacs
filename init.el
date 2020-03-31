@@ -8,8 +8,7 @@
 (let ((file-name-handler-alist nil)
       (orgfile (expand-file-name "gmacs.org" user-emacs-directory))
       (elfile (expand-file-name "gmacs.el" user-emacs-directory))
-      (elcfile (expand-file-name "gmacs.elc" user-emacs-directory))
-      (personalfile (expand-file-name "personal.el" user-emacs-directory)))
+      (elcfile (expand-file-name "gmacs.elc" user-emacs-directory)))
   (if (file-exists-p elcfile)
       (load-file elcfile)
     (if (or (not (file-exists-p elfile))
@@ -17,6 +16,8 @@
         (progn
           (require 'org)
           (org-babel-load-file orgfile))
-      (load-file elfile)))
+      (load-file elfile))))
+
+(let ((personalfile (expand-file-name "personal.el" user-emacs-directory)))
   (when (file-exists-p personalfile)
     (load-file personalfile)))
