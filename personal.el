@@ -27,3 +27,6 @@
        (setq org-latex-default-class "am-hmw"))
 
 (setq user-full-name "Annika Mauro")
+
+(setq ls-lisp-use-insert-directory-program nil)
+(require 'ls-lisp)
