@@ -6,7 +6,7 @@
  "/Library/TeX/texbin" ":" "/usr/local/bin" ":" (getenv "PATH")))
 
 (setq preview-colors '(nil 1 nil))
-(load-theme 'solarized-light)
+(gm/switch-theme)
 
 (key-chord-define-global "l," "<")
 (key-chord-define-global ".;" ">")
@@ -25,7 +25,5 @@
                 ("\\subsubsection{%s}" . "\\subsubsection*{%s}")))
 
        (setq org-latex-default-class "am-hmw"))
-
-(setq org-format-latex-options (plist-put org-format-latex-options :scale 1))
 
 (setq user-full-name "Annika Mauro")

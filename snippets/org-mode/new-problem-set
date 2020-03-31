@@ -8,16 +8,12 @@
 (numProblems (read-number "How many problems? "))
  (arr (split-string file num))
 (snippet-text
-(format "** TODO Problem Set ${1:1}
+"** TODO Problem Set ${1:1}
 :PROPERTIES:
-:EXPORT_TITLE: %s - Problem Set $1
+:EXPORT_TITLE: Problem Set $1
 :EXPORT_FILE_NAME: pset$1
 :EXPORT_DATE: $2
-:END:"
- (format "%s %s%s"
-          (upcase (nth 0 arr))
-          num
-          (upcase (nth 1 arr))))))
+:END:"))
 (save-excursion
 (insert "\n")
 (cl-loop for i from 1 to numProblems
