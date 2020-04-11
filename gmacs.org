@@ -688,24 +688,22 @@ Make files that start with a =#!= shebang executable.
 Authorize actions. The package =sudo-edit= is excellent for editing files owned by
 root.
 #+BEGIN_SRC emacs-lisp
-(when gm/user
-  (use-package pinentry
-    :demand t
-    :config (pinentry-start))
+(use-package pinentry
+  :demand t
+  :config (when gm/user (pinentry-start)))
 
-  (use-package epa-file
-    :ensure nil
-    :init (epa-file-enable)
-    :config (setenv "GPG_AGENT_INFO" nil)
-    :custom
-    (epg-gpg-program "/usr/bin/gpg2")
-    (epa-file-cache-passphrase-for-symmetric-encryption t)
-    (epa-file-select-keys nil)
-    (epa-pinentry-mode 'loopback))
+(use-package epa-file
+  :ensure nil
+  :init (epa-file-enable)
+  :config (setenv "GPG_AGENT_INFO" nil)
+  :custom
+  (epg-gpg-program "/usr/bin/gpg2")
+  (epa-file-cache-passphrase-for-symmetric-encryption t)
+  (epa-file-select-keys nil)
+  (epa-pinentry-mode 'loopback))
 
-  (use-package sudo-edit
-    :commands sudo-edit
-    :bind (("C-c C-x r" . sudo-edit))))
+(use-package sudo-edit
+  :commands sudo-edit)
 #+END_SRC
 *** Backups
 Keep backups in a dedicated spot and not in the current directory: this saves a
@@ -1186,6 +1184,16 @@ behavior added."
            (signal 'quit nil)))))
 
 (global-set-key [remap keyboard-quit] #'keyboard-quit-context+)
+#+END_SRC
+*** Undo Keyboard Macro in One Step
+Undoes all parts of keyboard macro at once.
+#+BEGIN_SRC emacs-lisp
+(defun block-undo (fn &rest args) (let ((marker
+  (prepare-change-group))) (unwind-protect (apply fn args)
+  (undo-amalgamate-change-group marker))))
+
+  (dolist (fn '(kmacro-call-macro kmacro-exec-ring-item)) (advice-add fn :around
+    #'block-undo))
 #+END_SRC
 ** Wordsmithing
 *** Basic Configuration
@@ -1794,7 +1802,7 @@ backwards are clunky: =C-M-f=, =C-M-b=. Since I've already taken my =M-digit=
 *** C++
 #+BEGIN_SRC emacs-lisp
 (setq-default c-default-style "linux"
-              c-basic-offset 4)
+              c-basic-offset 2)
 #+END_SRC
 ** Packages
 *** Package Management
@@ -2294,9 +2302,9 @@ screen, and once we're done, we can get right back to where we left off.
   :after magit)
 #+END_SRC
 *** Tramp
-Make sure to keep backups locally and not remotely.
+Don't keep backups: this is slow.
 #+BEGIN_SRC emacs-lisp
-(setq tramp-backup-directory-alist backup-directory-alist)
+(setq tramp-auto-save-directory nil)
 #+END_SRC
 Set tramp connection history location.
 #+BEGIN_SRC emacs-lisp
@@ -3693,6 +3701,12 @@ _q_ quit       _r_ remove result  _e_ examplify region
   ("r" org-babel-remove-result :color blue)
   ("H" org-babel-goto-src-block-head)
   ("q" nil :color blue))
+#+END_SRC
+*** Property Inheritance
+We want it!
+#+BEGIN_SRC emacs-lisp
+(setq org-use-property-inheritance t
+      org-attach-use-inheritance t)
 #+END_SRC
 ** Prettifying
 *** Headlines
@@ -5232,7 +5246,7 @@ be in math. The one subtlety is that we also look at the starred versions of
               nil
             (cond ((eq fr-type 'latex-fragment)
                    (and
-                    (>= loc begin)
+                    (> loc begin)
                     (<= loc (1- (- (org-element-property :end fr)
                                    (org-element-property :post-blank fr))))))
                   ((eq fr-type 'latex-environment)
