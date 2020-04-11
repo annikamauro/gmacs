@@ -14,16 +14,10 @@
 :EXPORT_TITLE: %s
 :END:
 * Problem Sets
-<<<<<<< HEAD
-* Materials
-** %s @ $1
-%s
-=======
 :PROPERTIES:
 :EXPORT_LATEX_CLASS_OPTIONS: [pset]
 :END:
 $0
->>>>>>> 7fdb6f72cbfe12e1b50ece3029db9b42a8d8c772
 * Options :noexport:
 #+OPTIONS: num:nil
 #+LATEX_HEADER: \\renewcommand{\\course}{%s}
@@ -33,11 +27,7 @@ $0
 * Footnotes"
 file
 course-name
-<<<<<<< HEAD
 course-name
-stamps
 course-name
-=======
->>>>>>> 7fdb6f72cbfe12e1b50ece3029db9b42a8d8c772
 )))
 (yas-expand-snippet snippet-text))

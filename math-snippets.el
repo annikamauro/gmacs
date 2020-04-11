@@ -1,7 +1,4 @@
 (setq gm/math-global-snippets
-<<<<<<< HEAD
-      '(("fi" "\\impliedby ")
-=======
       '(("dst" "^{\\ast{}\\ast{}}")
         ("cov" "\\Cov")
         ("var" "\\Var")
@@ -9,7 +6,6 @@
         ("#" "\\card")
         ("Li" "\\Li")
         ("Tor" "\\Tor ")
->>>>>>> 7fdb6f72cbfe12e1b50ece3029db9b42a8d8c772
         ("qqd" "\\qquad ")
         ("qd" "\\quad ")
         ("zsum" "\\sum_{n\\in\\Z} ")
