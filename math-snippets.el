@@ -1,5 +1,6 @@
 (setq gm/math-global-snippets
-      '(("qqd" "\\qquad ")
+      '(("fi" "\\impliedby ")
+        ("qqd" "\\qquad ")
         ("qd" "\\quad ")
         ("zsum" "\\sum_{n\\in\\Z} ")
         ("spec" "\\Spec ")
