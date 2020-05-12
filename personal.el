@@ -30,3 +30,10 @@
 
 (setq ls-lisp-use-insert-directory-program nil)
 (require 'ls-lisp)
+
+(when (string-equal system-type "catalina")
+  (setq exec-path (append exec-path '("/usr/local/bin"))))
+
+(setq ispell-local-dictionary "en_US"
+      ispell-hunspell-dictionary-alist
+      '(("en_US" "[[:alpha:]]" "[^[:alpha:]]" "[']" nil ("-d" "en_US") nil utf-8)))
