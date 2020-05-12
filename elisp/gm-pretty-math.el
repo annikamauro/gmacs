@@ -211,7 +211,10 @@
     ("triangleright" . "▷")
     ("bigtriangleup" . "△")
     ("bigtriangledown" . "▽")
-    ("circ" . "∘"))))
+    ("circ" . "∘")
+    ("wedge" . "∧")
+    ("vee" . "∨")
+    ("intprod" . "｣"))))
 
 (defvar gm/math-unspaced
   (append
