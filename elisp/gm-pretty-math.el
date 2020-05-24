@@ -247,7 +247,8 @@
      ("clubsuit" . "♣")
      ("diamondsuit" . "♢")
      ("heartsuit" . "♡")
-     ("spadesuit" . "♠"))))
+     ("spadesuit" . "♠")
+     ("D" . "D"))))
 
 (defvar gm/spaced-after
   '(("Div" . [?\s (Br . Bl) ?\s (Bc . Br) ?∇ (Br . Bc) ?\s (Br . Bc) ?\s (Bc . Bl) ?·])
@@ -257,7 +258,7 @@
     ("int" . [?\s (Bc . Bc) ?\s (Bc . Br) ?∫])))
 
 (defvar gm/math-commands
-  '(("dd" [?\s (Br . Bl) ?𝖽] "")
+  '(("dd" [?\s (Br . Bc) ?𝖽] "")
     ("pd" ?∂ "")))
 
 (defun gm/math-regexp-unspaced (name symbol)
@@ -273,7 +274,7 @@
   (cons (format "\\(\\\\%s \\)" name) symbol))
 
 (defun gm/math-regexp-commands (command open-delim close-delim)
-  (list (cons (format "\\([ ]?\\\\%s{\\)" command) open-delim)
+  (list (cons (format "\\([ ]?\\(\\\\!\\)?\\\\%s{\\)" command) open-delim)
         (cons (format "\\\\%s{[^}]*\\(}\\)" command) close-delim)))
 
 (defvar gm/math-replacements
