@@ -37,5 +37,3 @@
 (setq ispell-local-dictionary "en_US"
       ispell-hunspell-dictionary-alist
       '(("en_US" "[[:alpha:]]" "[^[:alpha:]]" "[']" nil ("-d" "en_US") nil utf-8)))
-
-(add-hook 'org-mode-hook #'quick-math-mode)

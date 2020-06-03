@@ -19,10 +19,11 @@
 :END:
 $0
 * Options :noexport:
-#+OPTIONS: num:nil
+#+OPTIONS: num:nil todo:nil
 #+LATEX_HEADER: \\renewcommand{\\course}{%s}
 # Local variables:
 # eval: (add-hook 'after-save-hook 'gm/org-latex-export nil t)
+# eval: (quick-math-mode 1)
 # end:
 * Footnotes"
 file
