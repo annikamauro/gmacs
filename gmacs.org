@@ -1875,7 +1875,6 @@ Basic configuration.
   (after! counsel
     (bind-key "C-s" #'counsel-grep-or-swiper pdf-view-mode-map))
   (bind-key "O" #'gm-pdf-open-external pdf-view-mode-map)
-  (bind-key "O" #'gm-pdf-open-external doc-view-mode-map)
   :diminish pdf-view-midnight-minor-mode
   :bind (:map pdf-view-mode-map
               ("h" . pdf-annot-add-highlight-markup-annotation)
@@ -1889,6 +1888,7 @@ Basic configuration.
   :hook
   (pdf-view-mode . pdf-view-midnight-minor-mode)
   (pdf-view-mode . pdf-view-fit-width-to-window))
+(bind-key "O" #'gm-pdf-open-external doc-view-mode-map)
 #+END_SRC
 Open with external viewer by default if wanted.
 #+BEGIN_SRC emacs-lisp
@@ -2927,8 +2927,7 @@ We customize the commands a bit.
       '(("j" counsel-org-goto)
         ("a" org-archive-subtree)
         ("c" org-set-tags-command)
-        ("d" (lambda () (interactive) (org-todo 'done)))
-        ("R" (lambda () (interactive) (org-todo "TOREAD") (gm/refile (expand-file-name "reading.org" org-directory) "Reading")))))
+        ("d" (lambda () (interactive) (org-todo 'done)))))
 #+END_SRC
 *** Invisible Edits
 When text is entered near a hidden area (...), it is hard to see what is
@@ -3338,8 +3337,7 @@ I like the following set of =TODO= words. This is what appears
 before an Org headline when a todo state is activated.
 #+BEGIN_SRC emacs-lisp :tangle no :noweb-ref org-settings
 (setq org-todo-keywords
-      '((sequence "TODO(t!)" "WAITING(w)" "|" "DONE(d)" "CANCELLED(c)")
-        (sequence "TOREAD(r!)" "READING(R)" "|" "READ(b)")))
+      '((sequence "TODO(t!)" "WAITING(w)" "|" "DONE(d)" "CANCELLED(c)")))
 #+END_SRC
 Automatically archive cancelled tasks.
 #+BEGIN_SRC emacs-lisp :tangle no :noweb-ref org-settings
@@ -4566,7 +4564,8 @@ Now for the Emacs setup. This library converts Org into HTML.
 #+BEGIN_SRC emacs-lisp
 (autoload 'org-mime-htmlize "org-mime")
 #+END_SRC
-Then we give ourselves a way to activate Org Mode mail.
+Then we give ourselves a way to activate Org Mode mail, and also to send HTML
+mail by default.
 #+BEGIN_SRC emacs-lisp :tangle no :noweb-ref notmuch-settings
 (defun gm/compose-html-org ()
   (interactive)
@@ -4576,6 +4575,7 @@ Then we give ourselves a way to activate Org Mode mail.
   (auto-fill-mode -1))
 
 (bind-key "M-m" #'gm/compose-html-org notmuch-message-mode-map)
+(bind-key "C-c C-c" (lambda! () (progn (gm/compose-html-org) (gm/org-htmlize-and-send))) notmuch-message-mode-map)
 #+END_SRC
 Let's define a function to send the mail.
 #+BEGIN_SRC emacs-lisp
@@ -5336,7 +5336,7 @@ I use this for postfix snippets, as explained.
     (or (eq (length math) 1)
         ;; Match one single latex macro such as \command
         ;; Only validate if this is the entire string
-        (string-match "\\`\\\\[a-zA-Z]+\\'" math))))
+        (string-match "\\`\\\\[a-zA-Z]+\\({}\\)?\\'" math))))
 #+END_SRC
 **** Increment Snippet Fields
 #+BEGIN_SRC emacs-lisp
@@ -5587,7 +5587,8 @@ results in =\frac{\sin x}{|}=.
       (unless sqbracket
         (setq match (substring match 1 -1)))
       (gm/math-insert-frac-match match env)))
-   ((eq (char-before) 125) ;; match closing curly braces
+   ((and (eq (char-before) 125)
+         (not (equal "({}" (gm/last-n-chars 3)))) ;; match closing curly braces
     (gm/math-frac-helper "[\\][a-z]*[\[{].*[\]}]" env))
    ((string-match "[[:alnum:]!]" (char-to-string (char-before)))
     (let ((env (if env env "frac")))
