@@ -1,5 +1,3 @@
-#+TITLE: My Emacs Configuration
-#+PROPERTY: header-args :results silent :tangle gmacs.el
 * Starting Up
 ** Fixing the UI
 :PROPERTIES:
@@ -12,9 +10,9 @@ part of the UI outside Emacs entirely, by editing the =~/.Xresources=.
 This kills the ugly parts of the UI before they are born. This is slightly
 faster than disabling them within Emacs, but it offers less flexibility. For
 example, if Emacs fails to start up properly, you are possibly left staring at a
-chimera of an editor, with default font colours but themed background
-colours. Because the font is about the same shade as the background, this makes
-for some very fun times debugging.
+chimera of an editor, with default font colours but themed background colours.
+Because the font is about the same shade as the background, this makes for some
+very fun times debugging.
 
 After editing =.Xresources=, remember to reload it with =xrdb merge ~/.Xresources=.
 *** Bars
@@ -75,8 +73,8 @@ startup take longer and aren't that useful.
       initial-major-mode 'fundamental-mode
       initial-scratch-message nil)
 #+END_SRC
-We either load the byte-compiled GMACS configuration file or tangle and load
-the GMACS literate config file (you're reading it!) written in Org Mode.
+We tangle and load the GMACS literate config file (you're reading it!) written
+in Org Mode.
 #+BEGIN_SRC emacs-lisp :tangle init.el
 (advice-add #'display-startup-echo-area-message :override #'ignore)
 (setq inhibit-startup-message t
@@ -87,16 +85,14 @@ the GMACS literate config file (you're reading it!) written in Org Mode.
 
 (let ((file-name-handler-alist nil)
       (orgfile (expand-file-name "gmacs.org" user-emacs-directory))
-      (elfile (expand-file-name "gmacs.el" user-emacs-directory))
-      (elcfile (expand-file-name "gmacs.elc" user-emacs-directory)))
-  (if (file-exists-p elcfile)
-      (load-file elcfile)
-    (if (or (not (file-exists-p elfile))
-            (file-newer-than-file-p orgfile elfile))
-        (progn
-          (require 'org)
-          (org-babel-load-file orgfile))
-      (load-file elfile))))
+      (elfile (expand-file-name "gmacs.el" user-emacs-directory)))
+
+  (if (or (not (file-exists-p elfile))
+          (file-newer-than-file-p orgfile elfile))
+      (progn
+        (require 'org)
+        (org-babel-load-file orgfile))
+    (load-file elfile)))
 
 (setq custom-file (expand-file-name "custom.el" user-emacs-directory))
 (when (file-exists-p custom-file) (load custom-file))
@@ -110,7 +106,7 @@ Enable lexical binding.
 #+BEGIN_SRC emacs-lisp
 ;; -*- lexical-binding: t -*-
 #+END_SRC
-Always load up a server when opening Emacs, unless one is already running..
+Always load up a server when opening Emacs, unless one is already running.
 #+BEGIN_SRC emacs-lisp
 (defun server-already-running-p ()
   "Is Emacs already running?
@@ -153,6 +149,10 @@ Now we prevent loading double buffers, which reduces stuttering.
 Silence some common warnings from the byte-compiler.
 #+BEGIN_SRC emacs-lisp
 (setq byte-compile-warnings '(not free-vars unresolved noruntime lexical make-local))
+#+END_SRC
+Generate native compiled files whenever Emacs loads a =.elc= file.
+#+BEGIN_SRC emacs-lisp
+(setq comp-deferred-compilation t)
 #+END_SRC
 Let the user know how quickly GMACS started.
 #+BEGIN_SRC emacs-lisp
@@ -336,10 +336,10 @@ tab (evil tabs!), the cursor will look as wide as a tab.
 Never lose your cursor again. This package lights up your cursor when the
 screen/cursor position is refactored. It's much more useful than it sounds.
 #+BEGIN_SRC emacs-lisp
-(use-package beacon
-  :defer 2
-  :config (beacon-mode 1)
-  :custom (beacon-color "#b58900"))
+;; (use-package beacon
+;;   :defer 2
+;;   :config (beacon-mode 1)
+;;   :custom (beacon-color "#b58900"))
 #+END_SRC
 *** Bells
 Visual, not audible bells.
@@ -749,27 +749,6 @@ nice and neat.
       auto-save-list-file-name (expand-file-name (concat gmacs-cache-dir "auto-save/.saves~")))
 #+END_SRC
 However, Emacs prints a lot of messages to the echo area telling you that a file
-has been autosaved. This is unnecessary, so I use [[http://pragmaticemacs.com/emacs/make-emacs-a-bit-quieter/][this hack]] from Pragmatic Emacs
-to quiet down the autosave. Essentially, we replace the default autosave
-function with our own silent version.
-#+BEGIN_SRC emacs-lisp
-(setq auto-save-timeout 99999)
-
-(defvar bjm/auto-save-timer nil
-  "Timer to run `bjm/auto-save-silent'")
-
-(defvar bjm/auto-save-interval 15
-  "How often in seconds of idle time to auto-save with
-`bjm/auto-save-silent'")
-
-(defun bjm/auto-save-silent ()
-  "Auto-save all buffers silently"
-  (interactive)
-  (do-auto-save t))
-
-(setq bjm/auto-save-timer
-      (run-with-idle-timer 0 bjm/auto-save-interval 'bjm/auto-save-silent))
-#+END_SRC
 **** History
 It's nice to have a history of commands and other things so that you can get
 right to work when you open a new Emacs instance, you can get right to work.
@@ -1014,22 +993,8 @@ I used to have my =init.el= set up so that, if =gmacs.elc= did not exist, it wou
 tangle =gmacs.org=. This unfortunately means that Emacs takes a long time to start
 up (about 6 seconds). To solve this, I tangle this very file on save.
 
-First, we set up a function to do the tangling. We have to, for example, refer
-to =user-emacs-directory= and not =user-emacs-directoryectory=, and run =(require
-'ob-tangle)= because the function is run in its own subprocess (this is what
-allows it to be asynchronous).
-#+BEGIN_SRC emacs-lisp
-(defun gm/tangle-gmacs-helper ()
-  (let ((src (expand-file-name "gmacs.org" user-emacs-directory))
-        (dst (expand-file-name "gmacs.el" user-emacs-directory))
-        (byte-compile-warnings '(not free-vars unresolved noruntime lexical make-local)))
-    (require 'ob-tangle)
-    (org-babel-tangle-file src dst)
-    (byte-compile-file dst)))
-#+END_SRC
-Then, we wrap this in an asynchronous process. If the config file is already
-being tangled, we kill that process and start a new one. I only really want to
-know about this process if it failed.
+If the config file is already being tangled, we kill that process and start a
+new one. I only really want to know about this process if it failed.
 #+BEGIN_SRC emacs-lisp
 (defvar gm--tangle-process nil)
 
@@ -1040,21 +1005,14 @@ know about this process if it failed.
     (when (process-live-p proc)
       (kill-process proc)
       (kill-buffer (process-buffer proc))))
-  (let ((proc (async-start (symbol-function #'gm/tangle-gmacs-helper)
+  (let ((proc (async-start
+               (lambda ()
+                 (require 'ob-tangle)
+                 (org-babel-tangle-file (expand-file-name "gmacs.org" user-emacs-directory)))
                (lambda (result)
                  (unless result
                    (message "GMACS unsuccessfully tangled: %s" result))))))
     (setq gm--tangle-process proc)))
-#+END_SRC
-Finally. we wrap this in a function that checks whether we're in the right file.
-It would be inefficient to tangle the configuration file every time a different
-file was edited and saved.
-#+BEGIN_SRC emacs-lisp
-(defun gm/tangle-if-config ()
-    (when (string-suffix-p "gmacs.org" (buffer-file-name))
-      (gm/tangle-gmacs)))
-
-(add-hook 'after-save-hook #'gm/tangle-if-config)
 #+END_SRC
 *** Benchmarking
 **** Functions
@@ -1176,7 +1134,7 @@ command to the client.
 *** Quit Current Context
 Quit minibuffer more easily. No more hammering =C-g=.
 #+BEGIN_SRC emacs-lisp
-(defun keyboard-quit-context+ ()
+(defun keyboard-quit-context ()
   "Quit current context.
 
 This function is a combination of `keyboard-quit' and
@@ -1194,7 +1152,7 @@ behavior added."
         (defining-kbd-macro
           (message
            (substitute-command-keys
-            "Quit is ignored during macro defintion, use \\[kmacro-end-macro] if you want to stop macro definition"))
+            "Quit is ignored during macro defintion, use [kmacro-end-macro] if you want to stop macro definition"))
           (cancel-kbd-macro-events))
         ((active-minibuffer-window)
          (when (get-buffer-window "*Completions*")
@@ -1208,7 +1166,11 @@ behavior added."
          (let ((debug-on-quit nil))
            (signal 'quit nil)))))
 
-(global-set-key [remap keyboard-quit] #'keyboard-quit-context+)
+;; (global-set-key [remap keyboard-quit] #'keyboard-quit-context)
+#+END_SRC
+*** Don't Ask to Kill Processes on Quit
+#+BEGIN_SRC emacs-lisp
+(setq confirm-kill-processes nil)
 #+END_SRC
 *** Undo Keyboard Macro in One Step
 Undoes all parts of keyboard macro at once.
@@ -1512,62 +1474,16 @@ Sometimes we accidentally add a word to our personal list and want to remove it.
         (insert (format "%s\n" w))))))
 #+END_SRC
 *** Text Manipulation
-**** Cut/Paste
-From the infamous Xah Lee.
+If there is no region active, operate on the current line.
 #+BEGIN_SRC emacs-lisp
-(defun xah-cut-line-or-region ()
-  "Cut current line, or text selection.
-When `universal-argument' is called first, cut whole buffer (respects `narrow-to-region').
-URL `http://ergoemacs.org/emacs/emacs_copy_cut_current_line.html'
-Version 2015-06-10"
-  (interactive)
-    (progn (if (use-region-p)
-               (kill-region (region-beginning) (region-end) t)
-             (kill-region (line-beginning-position) (line-beginning-position 2)))))
-
-(defun xah-copy-line-or-region ()
-  "Copy current line, or text selection.
-When called repeatedly, append copy subsequent lines.
-When `universal-argument' is called first, copy whole buffer (respects `narrow-to-region').
-
-URL `http://ergoemacs.org/emacs/emacs_copy_cut_current_line.html'
-Version 2018-09-10"
-  (interactive)
-  (if current-prefix-arg
-      (progn
-        (copy-region-as-kill (point-min) (point-max)))
-    (if (use-region-p)
-        (progn
-          (copy-region-as-kill (region-beginning) (region-end)))
-      (if (eq last-command this-command)
-          (if (eobp)
-              (progn )
-            (progn
-              (kill-append "\n" nil)
-              (kill-append
-               (buffer-substring-no-properties (line-beginning-position) (line-end-position))
-               nil)
-              (progn
-                (end-of-line)
-                (forward-char))))
-        (if (eobp)
-            (if (eq (char-before) 10 )
-                (progn )
-              (progn
-                (copy-region-as-kill (line-beginning-position) (line-end-position))
-                (end-of-line)))
-          (progn
-            (copy-region-as-kill (line-beginning-position) (line-end-position))
-            (end-of-line)
-            (forward-char)))))))
-
-(bind-key "C-k" 'xah-cut-line-or-region)
-(bind-key "M-w" 'xah-copy-line-or-region)
-#+END_SRC
-Org Mode rebinds =C-k= to its own kill line function, so we set up another binding
-here.
-#+BEGIN_SRC emacs-lisp :tangle no :noweb-ref org-settings
-(bind-key "C-k" #'xah-cut-line-or-region org-mode-map)
+(use-package whole-line-or-region
+  :defer 1
+  :bind (:map global-map
+              ("C-k" . 'whole-line-or-region-kill-region)
+              ("M-w" . 'whole-line-or-region-copy-region-as-kill))
+        (:map org-mode-map
+              ("C-k" . 'whole-line-or-region-kill-region)
+              ("M-w" . 'whole-line-or-region-copy-region-as-kill)))
 #+END_SRC
 **** Paragraph Navigation
 Keep blank lines as paragraph delimiters, no matter the major mode. From [[http://endlessparentheses.com/meta-binds-part-2-a-peeve-with-paragraphs.html][Meta
@@ -1649,70 +1565,6 @@ word.
   :bind (("C-=" . er/expand-region)
          ("M-2" . er/expand-region)))
 #+END_SRC
-**** Change Region to Title Case
-#+BEGIN_SRC emacs-lisp
-(defvar gm/title-case-skip-chars
-  "^\"<>(){}[]“”‘’‹›«»「」『』【】〖〗《》〈〉〔〕")
-
-(defun xah-title-case-region-or-line (@begin @end)
-  "Title case text between nearest brackets, or current line, or text selection.
-Capitalize first letter of each word, except words like {to, of,
-the, a, in, or, and, …}. If a word already contains cap letters
-such as HTTP, URL, they are left as is.
-
-When called in a elisp program, *begin *end are region boundaries.
-URL `http://ergoemacs.org/emacs/elisp_title_case_text.html'
-Version 2017-01-11"
-  (interactive
-   (if (use-region-p)
-       (list (region-beginning) (region-end))
-     (let (p1
-           p2
-           (skipChars gm/title-case-skip-chars))
-       (progn
-         (skip-chars-backward skipChars (line-beginning-position))
-         (setq p1 (point))
-         (skip-chars-forward skipChars (line-end-position))
-         (setq p2 (point)))
-       (list p1 p2))))
-  (let* ((strPairs [[" A " " a "]
-                    [" And " " and "]
-                    [" At " " at "]
-                    [" As " " as "]
-                    [" By " " by "]
-                    [" Be " " be "]
-                    [" Into " " into "]
-                    [" In " " in "]
-                    [" Is " " is "]
-                    [" It " " it "]
-                    [" For " " for "]
-                    [" Of " " of "]
-                    [" Or " " or "]
-                    [" On " " on "]
-                    [" Via " " via "]
-                    [" The " " the "]
-                    [" That " " that "]
-                    [" To " " to "]
-                    [" Vs " " vs "]
-                    [" With " " with "]
-                    [" From " " from "]
-                    ["'S " "'s "]
-                    ["'T " "'t "]]))
-    (save-excursion
-      (save-restriction
-        (narrow-to-region @begin @end)
-        (downcase-region @begin @end)
-        (upcase-initials-region (point-min) (point-max))
-        (let ((case-fold-search nil))
-          (mapc
-           (lambda (x)
-             (goto-char (point-min))
-             (while
-                 (search-forward (aref x 0) nil t)
-               (replace-match (aref x 1) "FIXEDCASE" "LITERAL")))
-           strPairs))))))
-#+END_SRC
-Note that one of the characters we skip is ="=.
 **** Replace String
 #+BEGIN_SRC emacs-lisp
 (defalias 'rs 'replace-string)
@@ -1826,7 +1678,7 @@ backwards are clunky: =C-M-f=, =C-M-b=. Since I've already taken my =M-digit=
 *** C++
 #+BEGIN_SRC emacs-lisp
 (setq-default c-default-style "linux"
-              c-basic-offset 2)
+              c-basic-offset 4)
 #+END_SRC
 ** Packages
 *** Package Management
@@ -1873,98 +1725,36 @@ could.
   :config (paradox-enable))
 #+END_SRC
 *** Special Modes
-**** PDF Tools
-Basic configuration.
+**** PDF Viewing
 #+BEGIN_SRC emacs-lisp
-(use-package pdf-tools
-  :mode (("\\.pdf\\'" . pdf-view-mode))
-  :commands pdf-view-mode
-  :init
-  (defun gm-pdf-open-external (&optional filename)
-    (require 'dired-open)
-    (interactive)
-    (let (close)
+(defun gm-pdf-open-external (&optional filename)
+  (require 'dired-open)
+  (interactive)
+  (let (close)
     (unless filename
       (setq filename (file-truename buffer-file-name))
       (setq close t))
     (dired-open--start-process filename "xdg-open")
     (when close
       (kill-buffer-and-window))))
-  :config
-  (setq pdf-annot-activate-created-annotations t)
-  (after! counsel
-    (bind-key "C-s" #'counsel-grep-or-swiper pdf-view-mode-map))
-  (bind-key "O" #'gm-pdf-open-external pdf-view-mode-map)
-  :diminish pdf-view-midnight-minor-mode
-  :bind (:map pdf-view-mode-map
-              ("h" . pdf-annot-add-highlight-markup-annotation)
-              ("t" . pdf-annot-add-text-annotation)
-              ("D". pdf-annot-delete)
-              ("r" . pdf-view--rotate)
-              ("n" . pdf-view-next-line-or-next-page)
-              ("C-n" . pdf-view-next-page-command)
-              ("p" . pdf-view-previous-line-or-previous-page)
-              ("C-p" . pdf-view-previous-page-command))
-  :hook
-  (pdf-view-mode . pdf-view-midnight-minor-mode)
-  (pdf-view-mode . pdf-view-fit-width-to-window))
+#+END_SRC
+#+BEGIN_SRC emacs-lisp
 (after! doc-view
   (bind-key "O" #'gm-pdf-open-external doc-view-mode-map))
 #+END_SRC
 Open with external viewer by default if wanted.
 #+BEGIN_SRC emacs-lisp
-(require 'openwith)
-(setq openwith-associations '(("\\.pdf\\'" "zathura" (file))
-                              ("\\.djvu\\'" "zathura" (file))))
-#+END_SRC
-Allow rotation.
-#+BEGIN_SRC emacs-lisp
-(after! pdf-tools
-  (defun pdf-view--rotate (&optional counterclockwise-p page-p)
-  "Rotate PDF 90 degrees.  Requires pdftk to work.\n
-Clockwise rotation is the default; set COUNTERCLOCKWISE-P to
-non-nil for the other direction.  Rotate the whole document by
-default; set PAGE-P to non-nil to rotate only the current page.
-\nWARNING: overwrites the original file, so be careful!"
-  (interactive)
-  ;; error out when pdftk is not installed
-  (if (null (executable-find "pdftk"))
-      (error "Rotation requires pdftk")
-    ;; only rotate in pdf-view-mode
-    (when (eq major-mode 'pdf-view-mode)
-      (let* ((rotate (if counterclockwise-p "left" "right"))
-             (file   (format "\"%s\"" (pdf-view-buffer-file-name)))
-             (page   (pdf-view-current-page))
-             (pages  (cond ((not page-p)                        ; whole doc?
-                            (format "1-end%s" rotate))
-                           ((= page 1)                          ; first page?
-                            (format "%d%s %d-end"
-                                    page rotate (1+ page)))
-                           ((= page (pdf-info-number-of-pages)) ; last page?
-                            (format "1-%d %d%s"
-                                    (1- page) page rotate))
-                           (t                                   ; interior page?
-                            (format "1-%d %d%s %d-end"
-                                    (1- page) page rotate (1+ page))))))
-        ;; empty string if it worked
-        (if (string= "" (shell-command-to-string
-                         (format (concat "pdftk %s cat %s "
-                                         "output %s.NEW "
-                                         "&& mv %s.NEW %s")
-                                 file pages file file file)))
-            (pdf-view-revert-buffer nil t)
-          (error "Rotation error!")))))))
-#+END_SRC
-Open PDFs to where they were last opened.
-#+BEGIN_SRC emacs-lisp
-(use-package pdf-view-restore
-  :after pdf-tools
+(use-package openwith
+  :ensure t
+  :defer 2
   :config
-  (add-hook 'pdf-view-mode-hook #'pdf-view-restore-mode)
-  :custom
-  (pdf-view-restore-filename "~/.emacs.d/cache/.pdf-view-restore"))
+  (openwith-mode 1)
+  (after! notmuch
+    (add-hook 'notmuch-message-mode-hook (lambda () (openwith-mode -1))))
+  :custom (openwith-associations '(("\\.pdf\\'" "zathura" (file))
+                                   ("\\.djvu\\'" "zathura" (file)))))
 #+END_SRC
-**** Epub reading
+**** Epub Reading
 We use =nov.el=. Change default reading font from Source Sans Pro (my default
 variable pitch font) to Minion Pro.
 #+BEGIN_SRC emacs-lisp
@@ -2319,9 +2109,15 @@ screen, and once we're done, we can get right back to where we left off.
     ad-do-it
     (delete-other-windows))
   (add-hook 'magit-process-find-password-functions 'magit-process-password-auth-source)
+  (remove-hook 'magit-status-sections-hook 'magit-insert-tags-header)
+  (remove-hook 'magit-status-sections-hook 'magit-insert-status-headers)
+  (remove-hook 'magit-status-sections-hook 'magit-insert-unpushed-to-pushremote)
+  (remove-hook 'magit-status-sections-hook 'magit-insert-unpulled-from-pushremote)
+  (remove-hook 'magit-status-sections-hook 'magit-insert-unpulled-from-upstream)
+  (remove-hook 'magit-status-sections-hook 'magit-insert-unpushed-to-upstream-or-recent)
   :bind (("C-x g" . magit-status)
          :map magit-status-mode-map
-              ("q" . magit-quit-session)))
+         ("q" . magit-quit-session)))
 
 (use-package ssh-agency
   :after magit)
@@ -2950,6 +2746,12 @@ We customize the commands a bit.
         ("c" org-set-tags-command)
         ("d" (lambda () (interactive) (org-todo 'done)))))
 #+END_SRC
+This isn't quite speed keys, but I'm adding back the functionality of expanding
+=<s= into a source block (and =<l= into a LaTeX block, and so on) that was changed
+in Org >=9.2.
+#+BEGIN_SRC emacs-lisp
+(require 'org-tempo)
+#+END_SRC
 *** Invisible Edits
 When text is entered near a hidden area (...), it is hard to see what is
 changed.
@@ -3012,7 +2814,7 @@ example, decide where to put the result of an Org Capture.
 #+END_SRC
 We similarly decide other default locations.
 #+BEGIN_SRC emacs-lisp
-(setq gm/agenda-org-files '("todo" "notes" "gcal" "reading")
+(setq gm/agenda-org-files '("todo" "notes" "reading")
       org-default-notes-file (expand-file-name "inbox.org" org-directory)
       org-agenda-files (append
                         `(,org-default-notes-file)
@@ -3039,7 +2841,7 @@ Keeping my refile locations minimal makes refiling faster; besides, my primary
 use case for refiling is to stow something away in its proper place for later
 use. and we just set our "proper places."
 #+BEGIN_SRC emacs-lisp
-(setq gm/org-non-refile-targets '("inbox" "gcal")
+(setq gm/org-non-refile-targets '("inbox")
       gm/org-refile-targets (--filter
                               (not (string-match-p
                                     (concat (regexp-opt gm/org-non-refile-targets) ".org$") it))
@@ -3285,13 +3087,22 @@ javascript:location.href='org-protocol://capture?template=n'
 I bind =c p= as a specific case of =c b= for PDF files. The following function
 fetches the path of the current PDF file in qutebrowser's temporary download directory.
 #+BEGIN_SRC emacs-lisp
+(defun gm/find-qutebrowser-download-dir (url)
+  (expand-file-name (car
+                     (--filter (string-match "qutebrowser-downloads" it)
+                               (directory-files "/tmp/")))
+                    "/tmp"))
+
 (defun gm/find-qutebrowser-download (url)
-  (let* ((qutedir (expand-file-name (car
-                                     (--filter (string-match "qutebrowser-downloads" it)
-                                               (directory-files "/tmp/"))) "/tmp"))
-         (file (progn (string-match "\\(tmp.*\\.pdf\\)" url)
-                      (substring url (match-beginning 1) (match-end 1)))))
-    (expand-file-name file qutedir)))
+  (let* ((file (progn (string-match "\\(tmp.*\\.pdf\\)" url)
+                      (substring url (match-beginning 1) (match-end 1))))
+         (qutedir (gm/find-qutebrowser-download-dir url))
+         (dldir "~/Downloads/")
+         (src (expand-file-name file qutedir))
+         (dst (expand-file-name file dldir)))
+    (unless (file-exists-p dst)
+      (rename-file src dst))
+    dst))
 #+END_SRC
 This template attaches the file for future reference.
 #+BEGIN_SRC emacs-lisp :tangle no :noweb-ref org-settings
@@ -3350,7 +3161,7 @@ rotate the image first to make sure it displays correctly.
     (message "Attached %s" start-file-full)
     (setq end-file (expand-file-name start-file (org-attach-dir nil)))
     (call-process "convert" nil nil nil end-file "-rotate" "-90" end-file)
-    (insert (org-make-link-string (format "file:%s" end-file)))
+    (insert (org-link-make-string (format "file:%s" end-file)))
     (org-display-inline-images t t)))
 #+END_SRC
 *** Todo Lists and Agenda
@@ -3432,20 +3243,6 @@ default). I prefer to see a larger view.
 #+BEGIN_SRC emacs-lisp
 (setq org-agenda-span 14)
 #+END_SRC
-However, that's not quite enough, because when I'm out and about, I want whatever
-I have in my Org Agenda to be able to alert me on my phone. I also want to be
-able to enter new events on the go. The best solution I've found for this is to
-integrate Org Mode with Google Calendar. The setup is contained in the file for
-my personal settings, =private.el=. Once you've set it up, you can find your
-calendar's private and secret IDs from [[https://console.developers.google.com/apis/credentials][this link]] (Google).
-#+BEGIN_SRC emacs-lisp
-(use-package org-gcal
-  :after org
-  :commands org-gcal-sync
-  :init (setq package-check-signature nil)
-  :custom (org-gcal-dir gmacs-cache-dir)
-  :hook (org-agenda-mode . org-gcal-sync))
-#+END_SRC
 *** Links
 I often use links to easily navigate to a relevant file in cases where I would
 rather not use =org-attach=.
@@ -3464,24 +3261,10 @@ being the title of that website.
   :bind (:map org-mode-map ("C-c y" . org-cliplink)))
 #+END_SRC
 *** Word Count
-It's very useful to be able to see the word count of a subtree when I am writing
-a paper for school.
-#+BEGIN_SRC emacs-lisp :tangle no :noweb-ref org-settings
+#+BEGIN_SRC emacs-lisp
 (use-package org-wc
   :commands org-wc-display
   :bind (:map org-mode-map ("C-c w" . gm/wc-display-current-subtree)))
-#+END_SRC
-I narrow to subtree by default because displaying the count for every subtree in
-the file is (usually) unnecessary and (always) too slow.
-#+BEGIN_SRC emacs-lisp
-(after! org-wc
-  (defun gm/wc-display-current-subtree (arg)
-    (interactive "P")
-    (if arg
-        (org-wc-display nil)
-      (save-restriction
-        (org-narrow-to-subtree)
-        (org-wc-display nil)))))
 #+END_SRC
 *** Org Ref
 A wonderfully featured framework for maintaining bibliographies and writing
@@ -3594,9 +3377,9 @@ the entry of interest in the bibfile.  but does not check that."
            (pdf (funcall org-ref-get-pdf-filename-function key))
            (pdf2 (reftex-get-bib-field "file" entry)))
       (if (file-exists-p pdf)
-          (org-open-link-from-string (format "[[file:%s]]" pdf))
+          (org-link-open-from-string (format "[[file:%s]]" pdf))
         (if (file-exists-p pdf2)
-            (org-open-link-from-string (format "[[file:%s]]" pdf2))
+            (org-link-open-from-string (format "[[file:%s]]" pdf2))
           (ding)))))))
 #+END_SRC
 Use the label names I make, which allows me to access them before export, at the
@@ -3631,45 +3414,45 @@ risk of them not being unique.
 #+END_SRC
 **** Links
 #+BEGIN_SRC emacs-lisp :tangle no :noweb-ref hydra
-(setq hydra-org-link-helper-hint-base
-      "
-org link helper
-_i_ backward slurp     _o_ forward slurp    _n_ next link
-_j_ backward barf      _k_ forward barf     _p_ previous link
+;; (setq hydra-org-link-helper-hint-base
+;;       "
+;; org link helper
+;; _i_ backward slurp     _o_ forward slurp    _n_ next link
+;; _j_ backward barf      _k_ forward barf     _p_ previous link
 
-_q_ quit
-")
+;; _q_ quit
+;; ")
 
-(defhydra hydra-org-link-helper (:color pink)
-  `hydra-org-link-helper-hint-base
-  ("i" org-link-edit-backward-slurp)
-  ("o" org-link-edit-forward-slurp)
-  ("j" org-link-edit-backward-barf)
-  ("k" org-link-edit-forward-barf)
-  ("n" org-next-link)
-  ("p" org-previous-link)
-  ("q" nil :color blue))
+;; (defhydra hydra-org-link-helper (:color pink)
+;;   hydra-org-link-helper-hint-base
+;;   ("i" org-link-edit-backward-slurp)
+;;   ("o" org-link-edit-forward-slurp)
+;;   ("j" org-link-edit-backward-barf)
+;;   ("k" org-link-edit-forward-barf)
+;;   ("n" org-next-link)
+;;   ("p" org-previous-link)
+;;   ("q" nil :color blue))
 
-(setq hydra-org-link-helper/hint
-      '(if (equal (org-element-property :path (org-element-context)) "marginnote")
-           (prog1
-               (let* ((lines (split-string hydra-org-link-helper-hint-base "\n"))
-                      (newhint "        _e_ shift margin note")
-                      hint)
-                 (setf (nth 2 lines) (concat (nth 2 lines) newhint))
-                 (setq hint (mapconcat 'identity lines "\n"))
-                 (eval
-                  (hydra--format nil '(nil nil :hint nil)
-                                 hint hydra-org-link-helper/heads)))
-             (define-key hydra-org-link-helper/keymap "e"
-               (lambda! ()
-                        (gm/math-make-marginnote-float)
-                        (hydra-org-link-helper/nil))))
-         (prog1
-             (eval
-              (hydra--format nil '(nil nil :hint nil)
-                             hydra-org-link-helper-hint-base hydra-org-link-helper/heads))
-           (define-key hydra-org-link-helper/keymap "e" nil))))
+;; (setq hydra-org-link-helper/hint
+;;       '(if (equal (org-element-property :path (org-element-context)) "marginnote")
+;;            (prog1
+;;                (let* ((lines (split-string hydra-org-link-helper-hint-base "\n"))
+;;                       (newhint "        _e_ shift margin note")
+;;                       hint)
+;;                  (setf (nth 2 lines) (concat (nth 2 lines) newhint))
+;;                  (setq hint (mapconcat 'identity lines "\n"))
+;;                  (eval
+;;                   (hydra--format nil '(nil nil :hint nil)
+;;                                  hint hydra-org-link-helper/heads)))
+;;              (define-key hydra-org-link-helper/keymap "e"
+;;                (lambda! ()
+;;                         (gm/math-make-marginnote-float)
+;;                         (hydra-org-link-helper/nil))))
+;;          (prog1
+;;              (eval
+;;               (hydra--format nil '(nil nil :hint nil)
+;;                              hydra-org-link-helper-hint-base hydra-org-link-helper/heads))
+;;            (define-key hydra-org-link-helper/keymap "e" nil))))
 #+END_SRC
 **** Tables
 #+BEGIN_SRC emacs-lisp
@@ -3740,8 +3523,7 @@ points.
 #+BEGIN_SRC emacs-lisp :tangle no :noweb-ref org-settings
 (use-package org-superstar
     :commands org-superstar-mode
-    :hook (org-mode . org-superstar-mode)
-    )
+    :hook (org-mode . org-superstar-mode))
 #+END_SRC
 In a similar vein, it helps the visual hierarchy to have text indented in
 accordance with the level of the heading, so I always use =org-indent-mode=.
@@ -3769,7 +3551,6 @@ Have lists begun by, for example, =-= look like a bullet list.
                            (0 (prog1 () (compose-region (match-beginning 1) (match-end 1) "•"))))))
 #+END_SRC
 This doesn't change anything in the buffer, which is nice.
-
 *** Pretty Symbols in Source Blocks
 I do a lot of programming in Org Mode source blocks, and I want to have features
 like =prettify-symbols-mode= for =lambda= functions in Elisp. However, this mode is
@@ -3787,47 +3568,6 @@ the default variable =lisp-prettify-symbols-mode= already has this pair.
                   '(("lambda" . ?λ)
                     ("lambda!" . (?λ (Br . Bl) ?!))))
             (prettify-symbols-mode)))
-#+END_SRC
-Then, we modify =org-src-font-lock-fontify-block= (the function that fontifies Org
-source blocks) as per [[https://emacs.stackexchange.com/questions/17283/is-it-possible-to-get-prettified-symbols-in-org-mode-source-blocks/17847][this SE post]].
-#+BEGIN_SRC emacs-lisp :tangle no :noweb-ref org-settings
-(defun org-src-font-lock-fontify-block (lang start end)
-  "Fontify code block.
-This function is called by emacs automatic fontification, as long
-as `org-src-fontify-natively' is non-nil."
-  (let ((lang-mode (org-src--get-lang-mode lang)))
-    (when (fboundp lang-mode)
-      (let ((string (buffer-substring-no-properties start end))
-        (modified (buffer-modified-p)) (org-buffer (current-buffer)) pos next)
-    (remove-text-properties start end '(face nil))
-    (with-current-buffer
-        (get-buffer-create
-         (concat " org-src-fontification:" (symbol-name lang-mode)))
-      (delete-region (point-min) (point-max))
-      (insert string " ") ;; so there's a final property change
-      (unless (eq major-mode lang-mode) (funcall lang-mode))
-      ;; Avoid `font-lock-ensure', which does not display fonts in
-      ;; source block.
-      (call-interactively #'font-lock-fontify-buffer)
-      (setq pos (point-min))
-      (while (setq next (next-single-property-change pos 'face))
-        (put-text-property
-         (+ start (1- pos)) (1- (+ start next)) 'face
-         (get-text-property pos 'face) org-buffer)
-        (setq pos next))
-      ;; Addition: also copy 'composition info for prettified symbols
-      (setq pos (point-min))
-      (while (setq next (next-single-property-change pos 'composition))
-        (put-text-property
-         (+ start (1- pos)) (1- (+ start next)) 'composition
-         (get-text-property pos 'composition) org-buffer)
-        (setq pos next))
-      ;; End addition
-      )
-    (add-text-properties
-     start end
-     '(font-lock-fontified t fontified t font-lock-multiline t))
-    (set-buffer-modified-p modified)))))
 #+END_SRC
 *** Inline Remote Images
 Add the link type.
@@ -3880,7 +3620,7 @@ default execution commands.
                                   (latex . t)
                                   (shell . t)))
 
-(setq org-babel-python-command "python3.8"
+(setq org-babel-python-command "python"
       org-babel-latex-command "pdflatex"
       org-babel-sh-command "sh")
 #+END_SRC
@@ -3970,18 +3710,6 @@ their Bitbucket repo; I have, for example, removed subscripts and superscripts.
 #+BEGIN_SRC emacs-lisp
 (require 'gm-pretty-math)
 #+END_SRC
-*** Don't Break Paragraph on Comments'
-[[https://emacs.stackexchange.com/questions/22574/orgmode-export-how-to-prevent-a-new-line-for-comment-lines][John Kitchin]] tells us how to remove comments from an Org document when exporting
-to LaTeX.
-#+BEGIN_SRC emacs-lisp
-(defun delete-org-comments (backend)
-  (cl-loop for comment in (reverse (org-element-map (org-element-parse-buffer)
-                                    'comment 'identity))
-        do (setf (buffer-substring (org-element-property :begin comment)
-                                (org-element-property :end comment))
-              "")))
-(add-hook 'org-export-before-processing-hook 'delete-org-comments)
-#+END_SRC
 *** Reformat Math Fragment
 For my primary use case of typing math in LaTeX, I don't care about how the
 source looks when I'm typing it; I'm often typing it live, so the main concern
@@ -3996,7 +3724,8 @@ introducing too many spaces in the earlier regexps.
 #+BEGIN_SRC emacs-lisp
 (defcustom gm/reformat-fragment-alist
   '(("+" " + " "spaces around +")
-    ("\\( \\|{}\\)*\\([_^]\\)[ ]*" "\\2" "remove spaces and braces around ^ and _")
+    ("[ ]*\\([\\^_]\\)[ ]*" "\\1" "remove spaces around ^ and _")
+    ("[\\^_]{}" "\\1" "remove empty sub/superscript")
     (" +" " " "no more than 1 space in a row")
     ("\\(\\\\(\\) " "\\1" "no space at start of fragment")
     (" \\(\\\\)\\)" "\\1" "no space at end of fragment"))
@@ -4025,17 +3754,27 @@ simply explains what the regexp does."
                (eq (char-before) (string-to-char "}")))
       (newline))))
 #+END_SRC
+*** Change Bracket Sizes
+This allows the user to easily change the size of brackets in LaTeX expressions.
+#+BEGIN_SRC emacs-lisp
+;; (autoload 'bratex-config "bratex")
+;; (add-hook 'quick-math-mode-hook #'bratex-config)
+#+END_SRC
 *** Equation Auto Preview
 :PROPERTIES:
 :ORDERED:  t
 :END:
-Use =imagemagick=.
-#+BEGIN_SRC emacs-lisp :tangle no :noweb-ref org-settings
-(setq org-preview-latex-default-process 'imagemagick)
+functions from =ov.el=.
+#+BEGIN_SRC emacs-lisp
+(defun ov-at (&optional point)
+  "Get an overlay at POINT.
+POINT defaults to the current `point'."
+  (or point (setq point (point)))
+  (car (overlays-at point)))
 #+END_SRC
 Not too small.
 #+BEGIN_SRC emacs-lisp :tangle no :noweb-ref org-settings
-(when gm/user (setq org-format-latex-options (plist-put org-format-latex-options :scale 2.75)))
+(when gm/user (setq org-format-latex-options (plist-put org-format-latex-options :scale 2.7)))
 #+END_SRC
 Where should it be? Let's put them all in the same place, so that common
 fragments (like =x^2=) are never generated more than once and so that we don't
@@ -4044,214 +3783,80 @@ litter our folders.
 (setq org-preview-latex-image-directory
       (expand-file-name "cache/ltximg/" user-emacs-directory))
 #+END_SRC
+Use this instead of =org-latex-preview=.
+#+BEGIN_SRC emacs-lisp
+(use-package math-preview
+  :load-path "~/.emacs.d/elisp/math-preview/"
+  :commands (math-preview-at-point)
+  :custom
+  (math-preview-scale 2.5)
+  (math-preview-margin '(0 . 0))
+  (math-preview-raise 0))
+#+END_SRC
 Inspired by John Kitchin. I've modified it to be toggleable and to run a hook on
 leaving a math fragment.
 #+BEGIN_SRC emacs-lisp
-(require 'ov)
-(defvar org-latex-fragment-last nil
+(defvar-local org-latex-fragment-last nil
   "Holds last fragment/environment you were on.")
 
-(defun my/org-latex-fragment--get-current-latex-fragment ()
+(defun org-latex-fragment-get-current-fragment ()
   "Return the overlay associated with the image under point."
-  (car (--select (eq (overlay-get it 'org-overlay-type) 'org-latex-overlay) (overlays-at (point)))))
+  (car (--select (eq (overlay-get it 'category) 'math-preview) (overlays-at (point)))))
 
-(defun my/org-in-latex-fragment-p ()
-    "Return the point where the latex fragment begins, if inside
+(defun org-latex-fragment-in-latex-fragment-p ()
+  "Return the point where the latex fragment begins, if inside
   a latex fragment. Else return false"
-    (let* ((el (org-element-context))
-           (el-type (car el)))
-      (and (or (eq 'latex-fragment el-type) (eq 'latex-environment el-type))
-          (org-element-property :begin el))))
+  (let* ((el (org-element-context))
+         (el-type (car el)))
+    (and (or (eq 'latex-fragment el-type) (eq 'latex-environment el-type))
+         (< (point) (- (org-element-property :end el) (org-element-property :post-blank el)))
+         (org-element-property :begin el))))
 
 (defun org-latex-fragment-toggle-auto ()
-  ;; Wait for the s
   (interactive)
   (while-no-input
-    (run-with-idle-timer 0.05 nil 'org-latex-fragment-toggle-helper)))
+    (run-with-idle-timer 0.01 nil 'org-latex-fragment-toggle-helper)))
+
+(defun org-latex-fragment-preview-last ()
+  (save-excursion
+    (goto-char org-latex-fragment-last)
+    (when (org-latex-fragment-in-latex-fragment-p)
+      (math-preview-at-point))))
+
+(defun org-latex-fragment-clear (pos)
+  (save-excursion
+    (goto-char pos)
+    (when (org-latex-fragment-get-current-fragment)
+      (math-preview-clear-at-point)))
+  (setq org-latex-fragment-last pos))
 
 (defun org-latex-fragment-toggle-helper ()
-    "Toggle a latex fragment image "
-    (condition-case nil
-        (and (eq 'org-mode major-mode)
-             (let* ((begin (my/org-in-latex-fragment-p)))
-               (cond
-                ;; were on a fragment and now on a new fragment
-                ((and
-                  ;; fragment we were on
-                  org-latex-fragment-last
-                  ;; and are on a fragment now
-                  begin
-                  ;; but not on the last one this is a little tricky. as you edit the
-                  ;; fragment, it is not equal to the last one. We use the begin
-                  ;; property which is less likely to change for the comparison.
-                  (not (= begin
-                          org-latex-fragment-last)))
-                 ;; go back to last one and put image back
-                 (save-excursion
-                   (goto-char org-latex-fragment-last)
-                   (when (my/org-in-latex-fragment-p) (org-toggle-latex-fragment))
-                   ;; now remove current imagea
-                   (goto-char begin)
-                   (let ((ov (my/org-latex-fragment--get-current-latex-fragment)))
-                     (when ov
-                       (delete-overlay ov)))
-                   ;; and save new fragment
-                   (setq org-latex-fragment-last begin)))
-
-                ;; were on a fragment and now are not on a fragment
-                ((and
-                  ;; not on a fragment now
-                  (not begin)
-                  ;; but we were on one
-                  org-latex-fragment-last)
-                 ;; put image back on
-                 (save-excursion
-                   (goto-char org-latex-fragment-last)
-                   (when (my/org-in-latex-fragment-p)(org-toggle-latex-fragment)))
-
-                 ;; unset last fragment
-                 (setq org-latex-fragment-last nil))
-
-                ;; were not on a fragment, and now are
-                ((and
-                  ;; we were not one one
-                  (not org-latex-fragment-last)
-                  ;; but now we are
-                  begin)
-                 (save-excursion
-                   (goto-char begin)
-                   ;; remove image
-                   (let ((ov (my/org-latex-fragment--get-current-latex-fragment)))
-                     (when ov
-                       (delete-overlay ov)))
-                   (setq org-latex-fragment-last begin)))
-                ;; else not on a fragment
-                ((not begin)
-                 (setq org-latex-fragment-last nil)))))
-      (error nil)))
-;; (defvar gm/org-last-fragment nil
-;;   "Holds the type and position of last valid fragment we were on.
-;;   Format: (FRAGMENT_TYPE FRAGMENT_POINT_BEGIN)")
-
-;; (defvar gm/org-valid-fragment-type '(latex-fragment latex-environment)
-;;   "List of types of fragments that will be previewed by `gm/org-preview-fragment'")
-
-;; (defun gm/org-curr-fragment (&optional location)
-;;   "Returns the type and position of the current fragment available
-;; for preview inside org-mode. Returns nil at non-displayable fragments."
-;;   (let* ((loc (if location location (point)))
-;;          (fr (if (not (eq loc (point)))
-;;                  (save-excursion
-;;                    (goto-char loc)
-;;                    (org-element-context))
-;;                (org-element-context)))
-;;          (fr-type (car fr)))
-;;     (when (memq fr-type gm/org-valid-fragment-type)
-;;       ;; \(...\)| cursor there should not result in active fragment
-;;       (let ( ; we only define these things now to optimize
-;;             (fr-begin (org-element-property :begin fr))
-;;             (fr-end (org-element-property :end fr))
-;;             ;; add one for the space after in \end{equation}
-;;             (fr-post-blank (1+ (org-element-property :post-blank fr))))
-;;         (when
-;;             ;; gotta fix some weird behaviour with environments
-;;             ;; make sure that if you're on the line after
-;;             ;; \end{equation}, you're considered out of the fragment
-;;             ;; check if point is between the actual end of the
-;;             ;; LaTex environment and the "supposed end" extended by blank ;; lines after the environment
-;;             (and
-;;              (> loc fr-begin)
-;;              (<= loc (- fr-end fr-post-blank)))
-;;           (list fr-type fr-begin))))))
-
-;; (defun gm/org-remove-fragment-overlay (fr)
-;;   "Remove fragment overlay at fr"
-;;   (let ((fr-type (nth 0 fr))
-;;         (fr-begin (nth 1 fr)))
-;;     (goto-char fr-begin)
-;;     (when (memq fr-type gm/org-valid-fragment-type)
-;;       (let ((ov (car (--filter
-;;                       (and
-;;                        (<= (overlay-start it) (point))
-;;                        (>= (overlay-end it) (point)))
-;;                       (org--list-latex-overlays)))))
-;;         (when ov
-;;           (delete-overlay ov))))))
-
-;; (defun gm/org-preview-fragment (fr)
-;;   "Preview org fragment at fr"
-;;   (let ((fr-type (nth 0 fr))
-;;         (fr-begin (nth 1 fr)))
-;;     (when (memq fr-type gm/org-valid-fragment-type)
-;;       (goto-char fr-begin)
-;;       (org-toggle-latex-fragment))))
-#+END_SRC
-
-#+BEGIN_SRC emacs-lisp
-;; (defun gm/org-auto-toggle-fragment-display ()
-;;   "Automatically toggle a displayable org mode fragment."
-;;   (and (eq 'org-mode major-mode)
-;;        (let ((curr (gm/org-curr-fragment))
-;;              (next (gm/org-curr-fragment (1+ (point)))))
-;;          (cond
-;;           ((and (not curr) next)
-;;            (gm/org-remove-fragment-overlay next)
-;;            (setq gm/org-last-fragment next))
-;;           ;; were on a fragment and now on a new fragment
-;;           ((and
-;;             ;; fragment we were on
-;;             gm/org-last-fragment
-;;             ;; and are on a fragment now
-;;             curr
-;;             ;; but not on the last one this is a little tricky. as you edit the
-;;             ;; fragment, it is not equal to the last one. We use the begin
-;;             ;; property which is less likely to change for the comparison.
-;;             (not (equal curr gm/org-last-fragment)))
-;;            ;; go back to last one and put image back, provided there is still a fragment there
-;;            (save-excursion
-;;              (gm/org-preview-fragment gm/org-last-fragment)
-;;              ;; now remove current image
-;;              (gm/org-remove-fragment-overlay curr))
-
-;;            ;; and save new fragment
-;;            (setq gm/org-last-fragment curr))
-
-;;           ;; were on a fragment and now are not on a fragment
-;;           ((and
-;;             ;; not on a fragment now
-;;             (not curr)
-;;             ;; but we were on one
-;;             gm/org-last-fragment)
-
-;;            ;; put image back on, provided that there is still a fragment here.
-;;            (save-excursion
-;;              (gm/org-preview-fragment gm/org-last-fragment))
-;;            ;; unset last fragment
-;;            (setq gm/org-last-fragment nil))
-
-;;           ;; were not on a fragment, and now are
-;;           ((and
-;;             ;; we were not one one
-;;             (not gm/org-last-fragment)
-;;             ;; but now we are
-;;             curr)
-;;            ;; remove image
-;;            (save-excursion
-;;              (gm/org-remove-fragment-overlay curr)
-;;              (setq gm/org-last-fragment curr))
-;;            ;; there is no point being in on the \( or \) part of the math fragment
-;;            ;; this code jumps the point into the actual math part of the fragment
-;;            (when (and (eq (char-before) 92)
-;;                        (eq (char-after) 41))
-;;                   (backward-char 1)))
-;;           ;; for the forward char, we have to do things a little
-;;           ;; differently, because the point is already in the fragment
-;;           ((and curr
-;;                 gm/org-last-fragment
-;;                 (eq (char-before) 92)
-;;                 (eq (char-after) 40)
-;;                 (eq last-command 'forward-char))
-;;            (forward-char 1))))))
+  "Toggle a latex fragment image "
+  (condition-case nil
+      (and (eq 'org-mode major-mode)
+           (let* ((begin (org-latex-fragment-in-latex-fragment-p)))
+             (cond
+              ;; were on a fragment and now on a new fragment
+              ;; need to replace old image and clear current image
+              ((and
+                org-latex-fragment-last
+                begin
+                (not (= begin
+                        org-latex-fragment-last)))
+               (org-latex-fragment-preview-last)
+               (org-latex-fragment-clear begin))
+              ;; were on a fragment and now are not on a fragment
+              ;; need to replace old image
+              ((and (not begin) org-latex-fragment-last)
+               (org-latex-fragment-preview-last)
+               (setq org-latex-fragment-last nil))
+              ;; were not on a fragment and now are
+              ((and (not org-latex-fragment-last) begin)
+               (org-latex-fragment-clear begin))
+              ;; else not on a fragment
+              ((not begin)
+               (setq org-latex-fragment-last nil)))))
+    (error nil)))
 #+END_SRC
 We can also centre equations and (this is useful when equation preview mode is
 disabled) add a tooltip to them that lets you edit the equation when you click
@@ -4298,16 +3903,7 @@ Create a minor mode to preview equations. The keybinding is in [[*Toggles][a hyd
         (add-hook 'post-command-hook 'org-latex-fragment-toggle-auto t 'local))
     (remove-hook 'post-command-hook 'org-latex-fragment-toggle-auto 'local)))
 
-(setq org-latex-fragment-toggle-helper (byte-compile 'org-latex-fragment-toggle-helper))
-(setq org-latex-fragment-toggle-auto (byte-compile 'org-latex-fragment-toggle-auto))
-
 (add-hook 'gm/eq-preview-mode-hook #'gm/eq-toggle)
-#+END_SRC
-*** Change Bracket Sizes
-This allows the user to easily change the size of brackets in LaTeX expressions.
-#+BEGIN_SRC emacs-lisp
-(autoload 'bratex-config "bratex")
-(add-hook 'quick-math-mode-hook #'bratex-config)
 #+END_SRC
 *** Allow Alphabetical List
 #+BEGIN_SRC emacs-lisp
@@ -4345,11 +3941,6 @@ This allows the user to easily change the size of brackets in LaTeX expressions.
                              (if (string= cmd "PDF") "-pdf" "-xelatex")
                              "-interaction=nonstopmode"
                              file)
-        ;; (async-start-process "latex-cleanup"
-        ;;                      "latexmk"
-        ;;                      nil
-        ;;                      "-xelatex"
-        ;;                      "-c")
         ))))
 #+END_SRC
 Bind this in Org mode.
@@ -4544,8 +4135,8 @@ SMTP for sending mail. The =stream-type= is important because I want my outgoing
 mail to at least use TLS encryption. One day, though, I would like to adopt a
 more rigorous system of encryption.
 #+BEGIN_SRC emacs-lisp :tangle no :noweb-ref notmuch-settings
-(setq send-mail-function #'async-smtpmail-send-it
-      message-send-mail-function #'async-smtpmail-send-it
+(setq send-mail-function #'smtpmail-send-it
+      message-send-mail-function #'smtpmail-send-it
       smtpmail-debug-info t
       smtpmail-debug-verb t
       smtpmail-stream-type 'starttls
@@ -4555,9 +4146,9 @@ more rigorous system of encryption.
 Some commonly used searches.
 #+BEGIN_SRC emacs-lisp :tangle no :noweb-ref notmuch-settings
 (setq notmuch-saved-searches
-      '((:name "inbox" :query "tag:inbox" :key "i")
+      '((:name "inbox" :query "tag:inbox" :key "i" :sort-order 'oldest-first)
         (:name "flagged" :query "tag:flagged" :key "f")
-        (:name "sent" :query "tag:sent" :key "s")
+        (:name "sent" :query "tag:sent" :key "s" :sort-order 'newest-first)
         (:name "drafts" :query "tag:draft" :key "d")))
 #+END_SRC
 Show newest mail first.
@@ -5050,7 +4641,7 @@ For YouTube videos, I like to play them right from Emacs with =mpv=.
     (start-process
      "mpv" nil shell-file-name
      shell-command-switch
-     (format "nohup 1>/dev/null 2>/dev/null %s \"%s\"" "umpv" link))))
+     (format "nohup 1>/dev/null 2>/dev/null %s \"%s\"" "mpv" link))))
 
 (defun gm/elfeed-play-with-mpv ()
   "Play elfeed entry link with mpv."
@@ -5194,7 +4785,7 @@ I use a prefix map to compactify this set of keybindings.
   _q_uit            _p_ause             _c_reate
   _e_mms            _P_revious          _k_ill
   _b_rowse          _N_ext              _r_eload
-  ^^                _B_back (10s)       ^^
+  ^^                _B_ack (10s)       ^^
   ^^                _F_orward (10s)     ^^
   ^^                ^^                  ^^
   "
@@ -5320,7 +4911,7 @@ Snippets go in [[file:math-snippets.el]].
   ("F" (insert "\\mathbb{F}") "𝔽")
   ("l" (insert "\\ell{}") "ℓ")
   ("o" (insert "\\circ{}") "∘")
-  ("r" (insert "\\varrho ") "ρ")
+  ("r" (insert "\\wp{}") "ρ")
   ("u" (insert "\\sqcup ") "∩")
   ("U" (insert "\\cap ") "∩")
   ("n" (insert "\\nu{}") "ν")
@@ -5335,8 +4926,6 @@ Then we bind this to semicolon.
 *** Helper Functions
 **** QuickMath Minor Mode
 #+BEGIN_SRC emacs-lisp :noweb no-export
-(defvar gm/use-math-abbrevs nil)
-
 (after! org
   (defvar gm/math-mode-map
     (let ((map (make-sparse-keymap)))
@@ -5416,10 +5005,7 @@ be in math. The one subtlety is that we also look at the starred versions of
                      (> (- env-open env-close) 0))))))))))
 #+END_SRC
 **** Enter Math Mode
-Enter a math fragment if inside one, exit otherwise. We keep track of the number
-of blank lines that follow the fragment, because according to Org, an =equation=
-environment doesn't end until the first non-newline character that follows. This
-makes for some awkward timing for activating previews.
+Enter a math fragment if inside one, exit otherwise.
 #+BEGIN_SRC emacs-lisp
 (defun gm/create-or-exit-math-fragment ()
   (interactive)
@@ -5427,20 +5013,19 @@ makes for some awkward timing for activating previews.
       (gm/reformat-fragment)
     (when (yas-active-snippets)
       (yas-exit-all-snippets))
-    (if (org-in-src-block-p)
-        (insert "$")
-      (insert "\\(")
-      (save-excursion (insert "\\)")))))
+    (insert "\\(")
+    (save-excursion (insert "\\)"))))
 #+END_SRC
 **** Last n Characters Before Point
-Return the last n characters before the point, or =loc= if provided.
+Return the last n characters before the point, or =loc= if provided. Provide less
+characters if there are not enough. Return nil if =loc= is too large.
 #+BEGIN_SRC emacs-lisp
 (defun gm/last-n-chars (n &optional loc)
+  (when (use-region-p) (setq loc (region-end)))
   (unless loc (setq loc (point)))
   (let ((start (- loc n)))
-    (when (and (>= start (point-min))
-               (<= start (point-max)))
-      (buffer-substring-no-properties (- loc n) loc))))
+    (when (<= start (point-max))
+      (buffer-substring-no-properties (max (point-min) (- loc n)) loc))))
 #+END_SRC
 **** Last LaTeX Letter
 Postfix commands often act on the last letter. For example, I want =fhat= to
@@ -5491,7 +5076,7 @@ I use this for postfix snippets, as explained.
     (or (eq (length math) 1)
         ;; Match one single latex macro such as \command
         ;; Only validate if this is the entire string
-        (string-match "\\`\\\\[a-zA-Z]+\\({}\\)?\\'" math))))
+        (string-match-p (concat "\\`\\\\" "[a-zA-Z]+\\({}\\)?\\'") math))))
 #+END_SRC
 **** Increment Snippet Fields
 #+BEGIN_SRC emacs-lisp
@@ -5504,9 +5089,28 @@ I use this for postfix snippets, as explained.
 :ORDERED:  t
 :END:
 I wrote this to reduce the amount of redundant code needed to set up the
-snippets. First, we create a suffix tree of all the math snippets.
+snippets. We create a list of the last characters of all the math
+snippets and bind each of these to a snippet expansion command.
 #+BEGIN_SRC emacs-lisp :tangle no :noweb-ref math-mode
 (defvar gm/longest-snippet)
+
+(defvar gm/math-snippet-by-suffix)
+
+(defun gm/math-snippet--bind-keys (keys)
+  (dolist (key keys)
+    (eval `(define-conditional-key gm/math-mode-map
+               ,key (lambda! () (gm/math-snippet-expand ,key))
+             (gm/in-math-p)))))
+
+(defun gm/math-snippet--create-suffix-tree (keys)
+  (setq gm/math-snippet-by-suffix nil)
+  (dolist (key keys)
+    (push (cons key '()) gm/math-snippet-by-suffix))
+  (dolist (snippet gm/math-snippets)
+    (let* ((key (car snippet))
+           (last (s-right 1 key))
+           (rest (s-left -1 key)))
+      (push rest (alist-get last gm/math-snippet-by-suffix nil nil 'equal)))))
 
 (defun gm/math-setup ()
   (load gm/math-snippet-loc)
@@ -5516,11 +5120,8 @@ snippets. First, we create a suffix tree of all the math snippets.
               (-max (--map (length (cadr it)) gm/math-snippets))))
   (let ((unique-suffixes
          (delete-dups (--map (s-right 1 (car it)) gm/math-snippets))))
-    (seq-do (lambda (key)
-              (eval `(define-conditional-key gm/math-mode-map
-                         ,key (lambda! () (gm/math-snippet-expand ,key))
-                       (gm/in-math-p))))
-            unique-suffixes)))
+    (gm/math-snippet--bind-keys unique-suffixes)
+    (gm/math-snippet--create-suffix-tree unique-suffixes)))
 #+END_SRC
 We make a function to get the possible completion candidates from the buffer.
 #+BEGIN_SRC emacs-lisp
@@ -5530,25 +5131,27 @@ We make a function to get the possible completion candidates from the buffer.
 #+END_SRC
 Then, we set up the creation of an actual snippet (note that its length is
 capped at a certain number of characters, defined by =gm/longest-snippet=). The
-longest snippet is currently =binom=, for the binomial coefficient (choose
-function).
+longest snippet is, at the time of writing, =binom=, for the binomial coefficient
+(choose function).
 #+BEGIN_SRC emacs-lisp
 (defun gm/math-snippet-expand (key)
-  (insert key)
   (-if-let* ((buff-cand (gm/buff-cand (car gm/longest-snippet)))
-             (completions (--keep (assoc it gm/math-snippets) buff-cand))
-             (snippet (--max-by (> (length (car it)) (length (car other)))
-                                completions)))
+             (completions (-intersection
+                           buff-cand
+                           (alist-get key gm/math-snippet-by-suffix nil nil 'equal)))
+             (snippet-match (--max-by (> (length it) (length other)) completions))
+             (snippet (assoc (concat snippet-match key) gm/math-snippets))
+             (expand (cadr snippet)))
       (progn
         ;; this has to be negative, we're deleting back
-        (delete-char (- 0 (length (car snippet))))
+        (delete-char (- 1 (length (car snippet))))
         ;; this is so we don't have two backslashes after something like \sim
         (when (= (char-before) ?\\) (delete-char -1))
         ;; is this a snippet expansion or just a text insertion?
-        (let ((expand (cadr snippet)))
+        (if (equal (car snippet) "/")
+            (gm/math-frac)
           (yas-expand-snippet (if (cddr snippet) (yas-lookup-snippet expand) expand))))
-    (when (equal key "/")
-      (gm/math-frac))))
+    (insert key)))
 #+END_SRC
 **** Add and View Snippet
 Now we give the user a way to easily add snippets.
@@ -5648,13 +5251,14 @@ Modified from the =cdlatex-tab= function in =cdlatex.el=.
   (unless (gm/in-math-p)
     (forward-char -1)
     (gm/reformat-fragment)))
+;; \]
 #+END_SRC
 Bind to tab.
 #+BEGIN_SRC emacs-lisp :tangle no :noweb-ref math-mode
 (define-conditional-key gm/math-mode-map (kbd "<tab>") #'math-tab (gm/in-math-p))
 #+END_SRC
 **** Subscripts/Indices
-This function eases the entry of subscripts such as $x_0$ or $a_{18}$. When a
+This function eases the entry of subscripts such as =x_0= or =a_{12}=. When a
 digit is pressed, if the last character is a letter, then a subscript is
 created. If this subscript is extended to a number with more than 1 digit,
 brackets are added to ensure proper LaTeX rendering. I also rarely enter a
@@ -5663,21 +5267,20 @@ creating them.
 #+BEGIN_SRC emacs-lisp
 (defun gm/math-number-subscript (n)
   (insert n)
-  (cond ((save-excursion
-           (backward-char)
-           (> (length (replace-regexp-in-string "[{}]" "" (if (gm/last-letter) (gm/last-letter) ""))) 1))
-         (save-excursion
-           (backward-char)
-           (insert "_")))
-        ((string-match "[a-zA-Z][0-9]" (gm/last-n-chars 2))
-         (save-excursion
-           (backward-char)
-           (insert "_")))
-        ((string-match "\_[0-9][0-9]" (gm/last-n-chars 3))
-         (save-excursion
-           (backward-char 2)
-           (insert "\{"))
-         (insert  "\}"))))
+  (save-excursion
+    (cond ((save-excursion
+             (backward-char)
+             (> (length (replace-regexp-in-string "[{}]" "" (if (gm/last-letter) (gm/last-letter) ""))) 1))
+             (backward-char)
+             (insert "_"))
+          ((string-match "[a-zA-Z][0-9]" (gm/last-n-chars 2))
+             (backward-char)
+             (insert "_"))
+          ((string-match "\_[0-9][0-9]" (gm/last-n-chars 3))
+           (save-excursion
+             (backward-char 2)
+             (insert "\{"))
+           (insert  "\}")))))
 #+END_SRC
 Add subscript bindings to each of the ten digits.
 #+BEGIN_SRC emacs-lisp :tangle no :noweb-ref math-mode
@@ -5692,78 +5295,160 @@ Typing =/= after an appropriate block (a number or a balanced set of parentheses
 creates a fraction with this block in the numerator and the point in the
 denominator. The outside parentheses will be removed; for example, =(\sin x)/=
 results in =\frac{\sin x}{|}=.
+
+First, this is a set of extra strings that we accept as a prefix to a match.
+There is also a list of strings which do not count as words for the purposes of
+=gm/math-frac--backward-word=.
 #+BEGIN_SRC emacs-lisp
 (defvar gm/math-frac-extras
-  '("\\\\vec"
-    "\\\\Delta"))
+  '("\\vec"))
 
-(defun gm/math-insert-frac-match (match &optional env)
+(defvar gm/math-frac-non-words
+  '("sum"))
+#+END_SRC
+We write a function to go backward from the point until no more characters match.
+#+BEGIN_SRC emacs-lisp
+;; Go backward by a latex sub/superscript
+(defun gm/math-frac--backward-script ()
+  (cond
+   ((string-match-p "[_^]." (gm/last-n-chars 2))
+    (backward-char 2))
+   ;; 125 is right curly brace
+   ((and (eq (char-before) 125)
+         (string-match-p "[_^]" (save-excursion
+                                  (backward-sexp)
+                                  (char-to-string (char-before)))))
+    (backward-sexp)
+    (backward-char))))
+
+(defun gm/math-frac--backward-word ()
+  (let ((pt (point)))
+    (save-excursion
+      (when (string-match-p "{}" (gm/last-n-chars 2))
+        (backward-char 2))
+      (when (and (string-match-p "\\w" (char-to-string (char-before)))
+                 (not (member (thing-at-point 'word 'no-properties) gm/math-frac-non-words)))
+        (backward-word)
+        (when (equal (char-before) (string-to-char "\\"))
+          (backward-char))
+        (setq pt (point))))
+    (goto-char pt)))
+
+(defun gm/math-frac--backward-match ()
+  ;; do this until we encounter a space character, or until we get into an
+  ;; infinite loop, and make sure the sub/superscripts connect to a valid word
+  (let ((pt (point-min)))
+    (while (not (or (eq (point) (point-min))
+                    (eq pt (point))
+                    (string-match-p "[[:space:]]" (char-to-string (char-before)))))
+      (setq pt (point))
+      (gm/math-frac--backward-script)
+      (gm/math-frac--backward-script)
+      ;; break loop and undo this step if this turns out not to be a valid word
+      (let ((ptcand (save-excursion (gm/math-frac--backward-word)
+                                    (point))))
+        (if (eq ptcand (point))
+            (goto-char pt)
+          (goto-char ptcand))))
+    (condition-case nil
+        (re-search-backward (concat (regexp-opt gm/math-frac-extras) "\\( \\|{}\\)"))
+      (error nil))))
+#+END_SRC
+This gets plugged into a function that gets the maximal matching suffix of a string.
+#+BEGIN_SRC emacs-lisp
+(defun gm/math-frac--start-of-match-string (str)
+  "Return maximal matching suffix for a fraction match.
+
+Match a LaTeX word with 0 to 2 sub/superscripts that is not
+preceded by ^ or _ (because this means something like matching
+the 1 in x_1). Allow possibly being preceded by a math extra in
+`gm/math-frac--start-of-match-string' The match must end at
+point."
+  (with-temp-buffer
+    (insert str)
+    (goto-char (point-max))
+    (gm/math-frac--backward-match)
+    (buffer-substring-no-properties (point) (point-max))))
+#+END_SRC
+Now we use this as the matching function in a function that returns the spot in
+the buffer where the maximal suffix begins.
+#+BEGIN_SRC emacs-lisp
+(defvar gm/math-frac-start-of-match-func 'gm/math-frac--start-of-match-string)
+
+(defun gm/math-frac--get-max-start ()
+  (let* ((fr (org-element-context))
+         (fr-type (car fr))
+         (fr-begin (org-element-property :begin fr)))
+    ;; Casework for farthest to look back
+    (max (line-beginning-position)
+         (if (eq fr-type 'latex-fragment)
+             ;; add 2 to account for \( \)
+             (+ 2 fr-begin)
+           0)
+         (condition-case nil
+             (marker-position
+              (yas--field-start
+               (yas--snippet-active-field (car (yas-active-snippets)))))
+           (error 0)))))
+
+(defun gm/math-frac--start-of-match ()
+  "Return start of maximal match ending at point.
+
+Look no further back than bol for environment and start of
+fragment for inline math, and never any further than the start of
+the most recently activated snippet"
+  (let* ((max-start (gm/math-frac--get-max-start))
+         (max-match (buffer-substring-no-properties max-start (point)))
+         (match (funcall gm/math-frac-start-of-match-func max-match)))
+    (- (point) (length match))))
+#+END_SRC
+Finally, we write the main function.
+#+BEGIN_SRC emacs-lisp
+(defun gm/math-frac--process-match (match)
+  (replace-regexp-in-string "\\`(\\(.*\\))\\'" "\\1" match))
+
+(defun gm/math-frac--insert-match (match env)
+  (yas-expand-snippet (yas-lookup-snippet env))
+  (insert (gm/math-frac--process-match match))
+  (yas-next-field))
+
+(defun gm/math-frac--region (beg end env)
+  "Replace text in region with fraction"
+  ;; default to frac environment
   (unless env (setq env "frac"))
-  (when match
-    (if (equal env "frac")
-        (yas-expand-snippet "\\frac{$1}{}")
-      (yas-expand-snippet (yas-lookup-snippet env)))
-    (insert match)
-    (forward-char 2)))
-
-(defun gm/math-frac-helper (regexp &optional env)
-  (when (looking-back regexp (line-beginning-position) t)
-    (let* ((begin (match-beginning 0))
-           (end (match-end 0))
-           (match (buffer-substring-no-properties begin end)))
-      (delete-region begin end)
-      (gm/math-insert-frac-match match env))))
+  (let ((match (buffer-substring-no-properties beg end)))
+    (delete-region beg end)
+    (gm/math-frac--insert-match match env)))
 
 (defun gm/math-frac (&optional env)
   (interactive)
-  (when (eq (char-before) ?/) ;; remove /
-    (delete-char -1))
-  (cond
-   ((use-region-p)
-    (let* ((begin (region-beginning))
-           (end (region-end))
-           (match (buffer-substring-no-properties
-                   begin end)))
-      (delete-region begin end)
-      ;; remove surrounding parens
-      (when (string-match-p "\\`([^()]*)\\'" match)
-        (setq match (substring match 1 -1)))
-      (gm/math-insert-frac-match match env)))
-   ((string-match "[\])]" (char-to-string (char-before)))
-    (let ((end (point))
-          (sqbracket (eq (char-before) 93)) ;; last char is sqbracket
-          (env (if (eq (char-before) 41) "frac" "quotient"))
-          match)
-      (when sqbracket
-        (backward-sexp))
-      (backward-sexp)
-      (setq match (buffer-substring-no-properties (point) end))
-      (delete-region (point) end)
-      (unless sqbracket
-        (setq match (substring match 1 -1)))
-      (gm/math-insert-frac-match match env)))
-   ((and (eq (char-before) 125)
-         (not (equal "({}" (gm/last-n-chars 3)))) ;; match closing curly braces
-    (gm/math-frac-helper "[\\][a-z]*[\[{].*[\]}]" env))
-   ((string-match "[[:alnum:]!]" (char-to-string (char-before)))
-    (let ((env (if env env "frac")))
-      (if (string-match "\\^" (char-to-string (char-before)))
-          (yas-expand-snippet (yas-lookup-snippet (if env env "frac")))
-        (gm/math-frac-helper
-         (format "%s\\( \\|{}\\)%s"
-                 (regexp-opt gm/math-frac-extras t)
-                 "\\\\?[[:alnum:]_!]+")
-         env)
-        (if (and (yas-active-snippets)
-                 (eq (point)
-                     (marker-position (yas--field-end (yas--snippet-active-field (car (yas-active-snippets)))))))  ;; check if snippet end here
-            (gm/math-frac-helper "\\\\?[[:alnum:]_!]+" env)
-          ;; Bit of a hacky fix
-          (gm/math-frac-helper "\\\\?[[:alnum:]_^!]+" env))
-        )))
-   (t (yas-expand-snippet (yas-lookup-snippet (if env env "frac"))))))
+  ;; use fraction if called with C-u and quotient if called with C-u C-u
+  (unless env
+    (setq env (cond
+               ((equal current-prefix-arg '(4)) "frac")
+               ((equal current-prefix-arg '(16)) "quotient"))))
+  (let ((ch (char-to-string (char-before)))
+        (end (point)))
+    (cond
+     ;; active region
+     ((use-region-p)
+      (gm/math-frac--region (region-beginning) (region-end) env))
+     ;; match is surrounded in brackets
+     ((string-match-p "[\])]" ch)
+      (let ((beg (progn
+                   (backward-sexp)
+                   (point))))
+        ;; For example, R[X] should use quotient by default
+        (when (equal ch "]")
+          (unless env (setq env "quotient"))
+          (setq beg (gm/math-frac--start-of-match)))
+        (gm/math-frac--region beg end env)))
+     ((string-match-p "[[:alnum:]!}]" ch)
+      (setq beg (gm/math-frac--start-of-match))
+      (gm/math-frac--region beg end env))
+     (t (unless env (setq env "frac"))
+        (yas-expand-snippet (yas-lookup-snippet env))))))
 #+END_SRC
-The binding is given in [[*Generate Snippets][Generate Snippets]].
 **** Easy Split Environments
 I wanted to make writing environments like =split= and =align= easier, so that I
 wouldn't have to manually add the newline (=\\=) at the end of each line required
@@ -5837,7 +5522,7 @@ Turns an inline math snippet into an equation.
           (hungry-delete-forward 0))))))
 #+END_SRC
 **** Convert Equation to Split
-Slightly janky way to turn equation into split. Does idempotence check.
+Janky way to turn equation into split. Does idempotence check.
 #+BEGIN_SRC emacs-lisp
 (defvar gm/math-split-delims '(" =" "\\le " "\\ge " "\\sim "))
 
@@ -5879,7 +5564,7 @@ and shifted notes use different link types.
 #+BEGIN_SRC emacs-lisp
 (defun gm/math-make-marginnote-float ()
   (interactive)
-  (if (org-in-regexp org-bracket-link-regexp 1)
+  (if (org-in-regexp org-link-bracket-re 1)
       (let* ((remove (list (match-beginning 0) (match-end 0)))
              (description (match-string-no-properties 3))
              (shift-regexp ";[0-9]*ex")
@@ -5936,3 +5621,15 @@ snippet calls this function.
              (line-beginning-position) (line-end-position)) "")
       (yas-expand-snippet (format "#+name: fig:%s\n #+caption: $2\n #+attr_latex: :vertical-alignment b\n [[file:figures/%s.pdf_tex]]\n$0" name name)))))
       #+END_SRC
+* Options
+*** Don't Make =<>= Parentheses
+There is so much elisp here that forms like =(< 1 2)= mess up the =check-parens=.
+#+BEGIN_SRC emacs-lisp
+(modify-syntax-entry ?\< "w" org-mode-syntax-table)
+(modify-syntax-entry ?\> "w" org-mode-syntax-table)
+#+END_SRC
+#+OPTIONS: todo:nil
+#+PROPERTY: header-args :results silent :tangle gmacs.el
+# Local variables:
+# eval: (add-hook 'after-save-hook 'gm/tangle-gmacs nil t)
+# end:
